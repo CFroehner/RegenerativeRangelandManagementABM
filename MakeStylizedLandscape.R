@@ -28,7 +28,7 @@ Starting_Prop_Conservation<-0.25
 StartingGrassMin<-0.2#lower bound of grass/rain. i.e., the worst areas have 20% of the best (before grazing)
 Spatial_Autocorrelation_Rain<-0.98 # this affects the spatial autocorelation of grass growth (0 is fully random, 1 is completely determined by space)
 Animal_cost<-5 #Price of animals. Used for buying/selling and also financial gains from having animals
-GrassPerCow<-0.15 # will need to play with this
+GrassPerCow<-0.2 # will need to play with this
 Min_cows<-2 #min cows per person
 Cow_Inequality<-1 #exponential rate for within-community cattle distribution. higher numbers = more EQUAL
 Econ_Inequality<-0.1 # Scalar, lower number = less within-community inequality (centered at community mean)
@@ -123,7 +123,7 @@ rT0RainAg<-raster::aggregate(rT0Rain, fact=2)
 #Make ANIMAL Population. Approximation of cattle estimates from AOI
 #This is not correlated with deprivation as these are not correlated across Southern Africa
 rAnimal<-rT0RainAg
-rAnimal[]<-rnbinom(n=length(rT0RainAg[]),mu=rT0RainAg[]*5,size=20)
+rAnimal[]<-rnbinom(n=length(rT0RainAg[]),mu=rT0RainAg[]*10,size=20)
 rAnimal<-raster::disaggregate(rAnimal, fact=2)
 rAnimal[]<-ceiling(rAnimal[]/4) #the disaggregation above effectively multiplies the number by 4
 
@@ -270,12 +270,17 @@ rstack<-stack(rstack,rWell)
 ConsComs<-data.frame(CommID=1:length(ConsComs),Conservation=ConsComs)
 Ranchers<-base::merge(Ranchers,ConsComs,by="CommID")
 
-#Assign behavior at 0 time step. Random for now, ranked according to herd size
-PastStockChange<-sort(rnorm(n=nrow(Ranchers),mean=0,sd=0.2))
-Ranchers <- Ranchers%>%dplyr::arrange(stock_count, decreasing = TRUE)%>%
+#Assign behavior at 0 time step. Random for now, 
+#PastStockChange<-sort(rnorm(n=nrow(Ranchers),mean=0,sd=0.4)) #if sorting by stock count
+PastStockChange<-rnorm(n=nrow(Ranchers),mean=0,sd=0.4) #if random (this is the right choice)
+#cutting out according to herd size. creating a bias toward early buying I think. 
+Ranchers <- Ranchers%>%#dplyr::arrange(stock_count, decreasing = TRUE)%>%
   mutate(PastStockChangeProp=PastStockChange,
          PastStockChangeAnimal=round(PastStockChangeProp*stock_count),
          PastStock=stock_count-PastStockChangeAnimal,
+         #Above can create negative numbers or 0s in past stock. Give everyone at least 1
+         PastStock=ifelse(PastStock<=0,1,PastStock),
+         #Now recalculate the percentages
          PastStockChangeProp=PastStockChangeAnimal/PastStock)%>%
   arrange(CommID,person_id)
 
@@ -292,4 +297,4 @@ Ranchers<-Ranchers%>%
 #ggplot(Ranchers,aes(x=stock_count,y=economic_wellbeing))+geom_point()
 
 
-
+ 
