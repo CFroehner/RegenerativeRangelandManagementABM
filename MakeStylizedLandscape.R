@@ -28,7 +28,7 @@ Starting_Prop_Conservation<-0.25
 StartingGrassMin<-0.2#lower bound of grass/rain. i.e., the worst areas have 20% of the best (before grazing)
 Spatial_Autocorrelation_Rain<-0.98 # this affects the spatial autocorelation of grass growth (0 is fully random, 1 is completely determined by space)
 Animal_cost<-5 #Price of animals. Used for buying/selling and also financial gains from having animals
-GrassPerCow<-0.2 # will need to play with this
+GrassPerCow<-0.15 # will need to play with this
 Min_cows<-2 #min cows per person
 Cow_Inequality<-1 #exponential rate for within-community cattle distribution. higher numbers = more EQUAL
 Econ_Inequality<-0.1 # Scalar, lower number = less within-community inequality (centered at community mean)

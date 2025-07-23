@@ -2,7 +2,7 @@ library(data.table)
 set.seed(123) # comment out for running many times
 Supplemental_fodder<-FALSE #does Cons grazing give supp food
 Set_Adoption<-TRUE #Is adoption of Conservation set at the starting number
-Forecasts<- "No_one" #Can take values of "No_one", "Everyone", "Rich","Poor", "Conservation"
+Forecasts<- "Everyone" #Can take values of "No_one", "Everyone", "Rich","Poor", "Conservation"
 ForecastError<-0 #How wrong are forecasts.#basically ranges 0:100
 Fodder_Price_Per_Cow<-200000 #play with this. Set high to essentially eliminate supplemental food buying from model
 CapitalGainRate<-1.02 #Financial gains from money in the bank
@@ -107,13 +107,14 @@ rstack<-stack(rstack,rGrass)
 #If no one is in deficit. They all get 0
 if(length(which(df2$DeficitGrass<0))==0){
   Ranchers$StockDeficit<-0
-  Ranchers$MoneyDeficit<-0
+  
 }
 
 
 #If there are deficits, do the following:
 if(length(which(df2$DeficitGrass<0))>0){ #This continues to wrap the next module
 
+  #substitute to be just communities with a deficit
   df2<-df2%>%filter(DeficitGrass<0)
   
   RanchersDef<-Ranchers%>%filter(CommID %in% df2$CommID) #only the ranchers from communities with deficit
@@ -138,27 +139,32 @@ if(Supplemental_fodder ==TRUE){ #give free food to people in conservation. Limit
   
 }
 
+#############
 #Now reduce the stock deficit and the money of each person as they buy fodder
-RanchersDef$MoneyDeficit<-Fodder_Price_Per_Cow*RanchersDef$StockDeficit
+# Calculate how many cows each person can afford fodder for
+RanchersDef$CowsAffordable <- floor(RanchersDef$Money / Fodder_Price_Per_Cow) 
 
+# Determine how many cows they can actually feed (can't exceed StockDeficit)
+RanchersDef$CowsToFeed <- pmin(RanchersDef$CowsAffordable, RanchersDef$StockDeficit)
 
-RanchersDef$Money <-RanchersDef$Money-RanchersDef$MoneyDeficit #reduce their money by the deficit
+# Calculate the actual money spent
+RanchersDef$MoneySpent <- RanchersDef$CowsToFeed * Fodder_Price_Per_Cow
 
-#If they had enough money, their deficit is gone. If not, it's the inverse of their money now.
-RanchersDef$MoneyDeficit<-ifelse(RanchersDef$Money <0, (RanchersDef$Money*-1),0 )
+# Update Money and StockDeficit accordingly
+RanchersDef$Money <- RanchersDef$Money - RanchersDef$MoneySpent
+RanchersDef$StockDeficit <- RanchersDef$StockDeficit - RanchersDef$CowsToFeed
 
-RanchersDef$Money <-ifelse(RanchersDef$Money <0, 0,RanchersDef$Money ) #dont let it go below 0
-
+#remove intermediate columns
+RanchersDef<-RanchersDef%>%dplyr::select(-c(CowsAffordable,CowsToFeed,MoneySpent))
 
 ######Module 3 - Animals die#####
-RanchersDef$StockDeficit<-ceiling(RanchersDef$MoneyDeficit/Fodder_Price_Per_Cow) #ceiling as only half food still counts as not enough
+
 
 RanchersDef$stock_count<-RanchersDef$stock_count-RanchersDef$StockDeficit #reduce stock by deficit number. 
 RanchersDef$stock_count[RanchersDef$stock_count<0] <- 0 #No negative numbers
 
 #Merge the deficit and not deficit ranchers
 RanchersNotDef$StockDeficit<-0
-RanchersNotDef$MoneyDeficit<-0
 Ranchers<-rbind(RanchersDef,RanchersNotDef)%>%arrange(CommID,person_id)
 
 #change number of animals in the raster
@@ -353,6 +359,7 @@ PayoffUpdate<-function(dff){
       peer_payoffs <- ObservedEconomicWellbeing[sampled_idx]
       peer_strategies <- PastStockChangeProp[sampled_idx]
       
+      ##MATT DOUBLE CHECK HERE TOO
       if (sum(peer_payoffs) == 0) {
         probs <- rep(1 / length(sampled_idx), length(sampled_idx))
       } else {
@@ -423,7 +430,7 @@ df<-base::merge(df,NextGrass,by=c("CommID","PlotID"))
 # new fct with linear effect of rain quality (for grass growth) on grass growth
 #played with these parameters. r_max controls response to rain. 
 #multiplier on current grass controls response to prexisting grass
-grass_growth <- function(current_grass, rain_quality, r_max = 1000, K = 110) {
+grass_growth <- function(current_grass, rain_quality, r_max = 300, K = 110) {
   # Logistic growth equation modified by rainfall
   growth <- (r_max * (rain_quality / 100)) * current_grass*0.05 * (1 - current_grass / K)
   # Update
@@ -442,12 +449,15 @@ df$NextGrass<- grass_growth(current_grass = df$Grass, rain_quality = df$Precip)
 #ggplot(df,aes(x=Grass,y=NextGrass,color=Precip))+geom_point(size=4,alpha=0.5)
 NextGrass<-df #Make an object so we can remake df without losing it
 
+#make the error in the forecast
 ForecastedGrass=rnorm(n=nrow(df), mean= df$NextGrass, sd= ForecastError )
 
 df$ForecastedGrass<-ForecastedGrass
   
 df2<-df%>%group_by(CommID)%>%
-  filter(Grazed==1)%>%summarise(Animals=sum(Animal),ForecastedGrass=sum(ForecastedGrass))%>% #add grass in grazed plots
+  summarise(
+    Animals = sum(Animal, na.rm = TRUE),  # Sum all animals in the group
+    ForecastedGrass = sum(ForecastedGrass[Grazed == 1], na.rm = TRUE))%>%   # Sum grass only where Grazed
   mutate(ForcastedAnimalCapacity=ForecastedGrass/GrassPerCow)%>% #how many animals can this sustain
   #what would be the ideal change. Multiply by 0.85 to keep from aiming to go all the way to 0
   mutate(ForecastedOptimalStrategy=(ForcastedAnimalCapacity*0.85 -Animals) / Animals)%>% 
@@ -480,9 +490,13 @@ Ranchers$animals_before <- Ranchers$stock_count
 Ranchers<- within(Ranchers, {
   
   # Proposed change: positive (buy), negative (sell)
+ 
   proposed_change <- round(new_strategy  * stock_count )  # round to ensure whole animals
+  #Need to subtract the animals they already have, for addition only!
+  proposed_change <- ifelse(proposed_change > 0, proposed_change - stock_count, proposed_change)
   
   #for people that have 0, but want to buy, make 1.
+  #could use a different number than 1 dependent on their money
   proposed_change[stock_count == 0 & new_strategy >= 0.5] <- 1
   
   # --- Buying Logic ---
@@ -508,7 +522,6 @@ Ranchers<- within(Ranchers, {
   stock_count <- stock_count + actual_change
   Money <- Money  - Animal_cost * actual_change  # Note: selling gives positive change to wealth
   
-  # Optional: log actual change
   actual_animals_change <- actual_change
 })
 
@@ -520,7 +533,7 @@ Ranchers$PastStockChangeProp<-ifelse(is.finite(Ranchers$PastStockChangeProp),Ran
 Ranchers$PastStockChangeProp<-ifelse(is.na(Ranchers$PastStockChangeProp),0,Ranchers$PastStockChangeProp)
 Ranchers$PastStock <-Ranchers$animals_before
 
-Ranchers<-Ranchers%>%select(-c(StockDeficit,MoneyDeficit,new_strategy,animals_before,actual_animals_change,sell_change,max_allowed_sell,
+Ranchers<-Ranchers%>%select(-c(StockDeficit,new_strategy,animals_before,actual_animals_change,sell_change,max_allowed_sell,
                      allowed_sell,max_sell,max_sell_prop,selling,actual_change,max_affordable,buying,proposed_change))
 
 
