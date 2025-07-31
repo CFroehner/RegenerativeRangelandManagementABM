@@ -1,7 +1,7 @@
 
-# Load packages -----------------------------------------------------------
+# PREPROCESSING -----------------------------------------------------------
 
-# library(raster)
+## Load Packages -----------------------------------------------------------
 library(sf)
 library(dplyr)
 library(tidyr)
@@ -9,327 +9,250 @@ library(ggplot2)
 library(terra)
 library(spdep)
 library(tidyterra)
+library(lubridate)
+library(purrr)
 
 # Create output folder if it doesn't exist
-output_dir <- "annual_pred"
+output_dir <- "Plots_Tables"
 if (!dir.exists(output_dir)) {
   dir.create(output_dir)
 }
 
-# Load Data ---------------------------------------------------------------
-# General order of assigning: bad, ok, good (for easy overview in tables)
-# check assignment !
+## Load and Transform Climate Model Data -----------------------------------
 
-# Download with slightly higher ymax??!!!
+# Load precipitation rasters from CMIP6 model (MPI-ESM1-2-LR) across southern 
+# African countries and time periods
+# Baseline historical run: 1850–1900; Future projections: 2050–2059
 
-# IPSL-CM6A-LR (France) with 2050-2059
-# 12 months x 30 years = 360 layers per dataset
-# baseline <- terra::rast("Data/pr_Amon_IPSL-CM6A-LR_historical_r1i1p1f1_gr_19610116-19901216.nc") # 1961 - 1990
-# 12 months x 10 years = 120 layers per dataset
-# pred1 <- terra::rast("Data/pr_Amon_IPSL-CM6A-LR_ssp370_r1i1p1f1_gr_20500116-20591216.nc")  # Worst Case (SSP3-7.0)
-# pred2 <- terra::rast("Data/pr_Amon_IPSL-CM6A-LR_ssp245_r1i1p1f1_gr_20500116-20591216.nc")  # Current Policy (SSP2-4.5)
-# pred3 <- terra::rast("Data/pr_Amon_IPSL-CM6A-LR_ssp126_r1i1p1f1_gr_20500116-20591216.nc")  # Optimistic (SSP1-2.6)
+baseline <- terra::rast("Data/MPI-2050to2069/pr_Amon_MPI-ESM1-2-LR_historical_r1i1p1f1_gn_18500116-19001216.nc")   # 1850 - 1900
+# baseline <- baseline[[1:120]]  # first 10 years (12 × 10 = 120 layers) # for 
+# visualizations uncomment because currently the sum is plotted
+# (for original / longer time-period than projections, change sum to mean)
 
-# IPSL-CM6A-LR (France) with 2050-2079
-# baseline <- terra::rast("Data/pr_Amon_IPSL-CM6A-LR_historical_r1i1p1f1_gr_19610116-19901216.nc") # 1961 - 1990
-# pred1 <- terra::rast("Data/pr_Amon_IPSL-CM6A-LR_ssp370_r1i1p1f1_gr_20500116-20791216.nc")  # Worst Case (SSP3-7.0) 2050 - 2079!
-# pred2 <- terra::rast("Data/pr_Amon_IPSL-CM6A-LR_ssp245_r1i1p1f1_gr_20500116-20791216.nc")  # Current Policy (SSP2-4.5) 2050 - 2079!
-# pred3 <- terra::rast("Data/pr_Amon_IPSL-CM6A-LR_ssp126_r1i1p1f1_gr_20500116-20791216.nc")  # Optimistic (SSP1-2.6) 2050 - 2079!
-# pred4 <- terra::rast("Data/pr_Amon_IPSL-CM6A-LR_ssp585_r1i1p1f1_gr_20500116-20791216.nc")  # Dytopian (SSP5-8.5) 2050 - 2079!
+# pred1 <- terra::rast("Data/MPI-2050to2059/pr_Amon_MPI-ESM1-2-LR_ssp370_r1i1p1f1_gn_20500116-20591216.nc")  # Pessimistic (SSP3-7.0)
+pred1 <- terra::rast("Data/MPI-2050to2059/pr_Amon_MPI-ESM1-2-LR_ssp585_r1i1p1f1_gn_20500116-20591216.nc")  # Dystopian (SSP5-8.5) / fossil-fueled development
+pred2 <- terra::rast("Data/MPI-2050to2059/pr_Amon_MPI-ESM1-2-LR_ssp245_r1i1p1f1_gn_20500116-20591216.nc")  # Current Policy (SSP2-4.5) / middle of the road
+pred3 <- terra::rast("Data/MPI-2050to2059/pr_Amon_MPI-ESM1-2-LR_ssp126_r1i1p1f1_gn_20500116-20591216.nc")  # Optimistic (SSP1-2.6) / sustainability
 
-# MPI-ESM1-2-LR (Germany) with 2050-2059
-baseline <- terra::rast("Data/MPI-2050to2059/pr_Amon_MPI-ESM1-2-LR_historical_r1i1p1f1_gn_18500116-19001216.nc")   # 1850 - 1900
-pred1 <- terra::rast("Data/MPI-2050to2059/pr_Amon_MPI-ESM1-2-LR_ssp585_r1i1p1f1_gn_20500116-20591216.nc")  # Dystopian (SSP5-8.5)
-pred2 <- terra::rast("Data/MPI-2050to2059/pr_Amon_MPI-ESM1-2-LR_ssp245_r1i1p1f1_gn_20500116-20591216.nc")  # Current Policy (SSP2-4.5)
-pred3 <- terra::rast("Data/MPI-2050to2059/pr_Amon_MPI-ESM1-2-LR_ssp126_r1i1p1f1_gn_20500116-20591216.nc")  # Optimistic (SSP1-2.6)
-
-# Quick check
-plot(baseline[[1]], main = names(baseline)[1]) # January 1850
-plot(pred1[[1]], main = names(pred1)[1]) # January 2050 Worst Case
-plot(pred2[[1]], main = names(pred2)[1]) # January 2050 Current Policy
-plot(pred3[[1]], main = names(pred3)[1]) # January 2050 Optimistic
-
-plot(baseline[[1]], main = names(baseline)[1])
-plot(pred1[[120]], main = names(pred1)[120]) # December 2059 Worst Case
-plot(pred2[[120]], main = names(pred2)[120]) # December 2059 Current Policy
-plot(pred3[[120]], main = names(pred3)[120]) # December 2059 Optimistic
-
-# Summarize per year ------------------------------------------------------
-
-summarize_annual_precip <- function(rast, start_year) {
-  n_layers <- nlyr(rast) # get number of layers
-  n_years <- n_layers / 12 # how many years
+# Convert precipitation from kg/m²/s to kg/m²/month
+convert_to_mm_per_month <- function(rast) {
+  dates <- as.Date(time(rast))
+  seconds_in_month <- lubridate::days_in_month(dates) * 86400
   
-  annual_list <- vector("list", n_years)
-  
-  for (i in 1:n_years) {
-    layer_indices <- ((i - 1) * 12 + 1):(i * 12) # select 12 monthly layers
-    year_sum <- sum(rast[[layer_indices]]) # sum up element wise
-    names(year_sum) <- paste0("Annual_", start_year + i - 1)
-    annual_list[[i]] <- year_sum
+  for (i in seq_len(nlyr(rast))) {
+    rast[[i]] <- rast[[i]] * seconds_in_month[i]
   }
   
-  annual_stack <- rast(annual_list)
-  return(annual_stack)
+  return(rast)
 }
 
-annual_baseline <- summarize_annual_precip(baseline, start_year = 1961)
-annual_pred1 <- summarize_annual_precip(pred1, start_year = 2050)
-annual_pred2 <- summarize_annual_precip(pred2, start_year = 2050)
-annual_pred3 <- summarize_annual_precip(pred3, start_year = 2050)
-# annual_pred4 <- summarize_annual_precip(pred4, start_year = 2050)
+baseline <- convert_to_mm_per_month(baseline)
+pred1 <- convert_to_mm_per_month(pred1)
+pred2 <- convert_to_mm_per_month(pred2)
+pred3 <- convert_to_mm_per_month(pred3)
 
-# Quick check baseline
-names(annual_baseline)
-monthly_values <- terra::values(baseline)[1, ] # monthly values for single pixel
-sum_1961 <- sum(monthly_values[1:12]) # for this pixel: sum across mos of 1961
-annual_value <- terra::values(annual_baseline)[1, 1] # comp. with sum from fct (pixel 1, year 2050)
-sum_1961 == annual_value
 
-# Quick check pred1
-names(annual_pred1)
-monthly_values <- terra::values(pred1)[1, ] # monthly values for single pixel
-sum_2050 <- sum(monthly_values[1:12]) # for this pixel: sum across mos of 2050
-annual_value <- terra::values(annual_pred1)[1, 1] # comp. with sum from fct (pixel 1, year 2050)
-sum_2050 == annual_value
+## Define AOI and Analytical Grid ------------------------------------------
 
-# Map to AOI --------------------------------------------------------------
+AOI <- read_sf("AOI.shp")
 
-## Create grid -----------------------------------------------------------
-
-AOI <-read_sf("AOI.shp")
 AOI <- st_transform(AOI) %>%
-               # , crs = crs(raster_stack)
-  st_buffer(dist = 0.05) %>% # small buffer because countries don't perfectly 
-  # align and it makes a gap
-  st_union() 
+  st_buffer(dist = 0.05) %>% # buffer due to potential shapefile - raster diffs.
+  st_union()
 
-grids<-sf::st_make_grid(AOI, cellsize = 0.25) %>%
+# Generate a grid over AOI with resolution 0.25
+grids <- st_make_grid(AOI, cellsize = 0.25) %>%
   st_as_sf() %>%
-  filter(st_intersects(AOI, ., sparse = FALSE)[1, ]) %>%   #index of grids fully 
-  # or partially covered by the AOI
-  mutate(Index = row_number())
+  filter(st_intersects(AOI, ., sparse = FALSE)[1, ]) %>%
+  mutate(Index = row_number()) %>%
+  st_transform()
 
-# Transform grid into the CRS of the grid again as a precaution
-grids <- st_transform(grids
-                      # , crs = crs(raster_stack)
-                      ) 
-
-ggplot(grids) + 
-  geom_sf() + 
-  geom_sf(data = AOI,color = "green",fill = NA)
-
-# terra-compatible raster with target resolution
+# Construct target raster for resampling using vectorized grid
 grids_vect <- vect(grids)
-target_raster <- terra::rast(
-  grids_vect, resolution = 0.25
-  # , crs = crs(raster_stack)
-  )
+target_raster <- terra::rast(grids_vect, resolution = 0.25)
 
-## Map predicted precipitation onto grid -----------------------------------
+# Diagnostic plot for visual inspection of grid overlay
+AOI_grid <- ggplot(grids) +
+  geom_sf() +
+  geom_sf(data = AOI, color = "green", fill = NA)
 
-scenarios <- list(
-  baseline = annual_baseline,
-  'bad' = annual_pred1,
-  'ok' = annual_pred2,
-  'good' = annual_pred3
+ggsave("Plots_Tables/AOI_grid.png", AOI_grid, width = 10, height = 6, dpi = 300)
+
+## Define and Extract Seasonal (JJA/DJF) Precipitation --------------------
+
+# Helper function to subset raster layers by months
+get_season_stack <- function(rast, season_months) {
+  dates <- as.Date(time(rast))
+  months <- month(dates)
+  selected_layers <- which(months %in% season_months)
+  return(rast[[selected_layers]])
+}
+
+# Define meteorological seasons
+winter_months <- c(6, 7, 8)   # JJA
+summer_months <- c(12, 1, 2)  # DJF
+
+# Stack seasonal subsets for each scenario
+seasonal_rasters <- list(
+  baseline_winter = get_season_stack(baseline, winter_months),
+  baseline_summer = get_season_stack(baseline, summer_months),
+  bad_winter = get_season_stack(pred1, winter_months),
+  bad_summer = get_season_stack(pred1, summer_months),
+  ok_winter = get_season_stack(pred2, winter_months),
+  ok_summer = get_season_stack(pred2, summer_months),
+  good_winter = get_season_stack(pred3, winter_months),
+  good_summer = get_season_stack(pred3, summer_months)
 )
 
-# Calculate global min and max values for consistent legend in plots across years and scenarios
-global_min <- min(unlist(lapply(scenarios, function(s) terra::minmax(s)[1, ])), na.rm = TRUE)
-global_max <- max(unlist(lapply(scenarios, function(s) terra::minmax(s)[2, ])), na.rm = TRUE)
+# Compute mean seasonal precipitation for each season/scenario
+seasonal_sums <- lapply(seasonal_rasters, function(r) {
+  terra::app(r, fun = sum, na.rm = TRUE)
+})
 
-all_grids_long <- list()
+# Resample to target grid and crop to AOI
+seasonal_sums_cropped <- purrr::imap(seasonal_sums, function(r, name) {
+  r_resampled <- terra::resample(r, target_raster, method = "bilinear")
+  r_cropped <- terra::mask(terra::crop(r_resampled, vect(AOI)), vect(AOI))
+  names(r_cropped) <- name
+  r_cropped
+})
 
-for (scenario_name in names(scenarios)) {
-  
-  message("Processing scenario: ", scenario_name)
-  
-  raster_stack <- scenarios[[scenario_name]]
-  
-  # Interpolate each layer to target grid resolution
-  raster_stack_interp <- terra::resample(
-    raster_stack, target_raster, method = "bilinear")
-  
-  # Crop/mask to grids
-  raster_stack_cut <- terra::crop(raster_stack_interp, vect(AOI))
-  raster_stack_cut <- terra::mask(raster_stack_cut, vect(AOI))
-  
-  # Extract year values from layer names
-  years <- names(raster_stack_cut)
-  years <- years[grepl("^Annual_\\d{4}$", years)]  # make sure to keep only annual layers
-  years <- as.integer(sub("Annual_", "", years))   # extract the year number
-  
-  for (y in years) {
-    layer_name <- paste0("Annual_", y)
-    
-    r_cut <- raster_stack_cut[[layer_name]]
-    
-    # Convert grids_vect to sf for plotting just the outline
-    grids_outline <- sf::st_union(sf::st_as_sf(grids_vect))
-    
-    # Plot raster with outline only
-    p <- ggplot() +
-      geom_spatraster(data = r_cut) +
-      geom_sf(data = grids_outline, fill = NA, color = "black", linewidth = 0.5) +
-      scale_fill_viridis_c(
-        name = "Precip (kg/m²/s)", # adapt unit?
-        na.value = NA,
-        limits = c(global_min, global_max)  # for consistent fill across all years and scenarios
-      ) +
-      # scale_fill_viridis_c(name = "Precip (kg/m²/s)", na.value = NA) + # adapt unit?
-      labs(
-        title = paste("Annual Precipitation -", y),
-        subtitle = paste("Scenario:", scenario_name)
-      )
-    
-    print(p)
-    
-    ggsave(
-      filename = file.path(output_dir, paste0("map_", scenario_name, "_", y, ".png")),
-      plot = p, width = 6, height = 5
-    )
-  }
-  
-  raster_df <- as.data.frame(raster_stack_cut, xy = TRUE, na.rm = TRUE)
-  
-  raster_long <- raster_df %>%
-    pivot_longer(
-      cols = starts_with("Annual_"),
-      names_to = "Year",
-      names_prefix = "Annual_",
-      values_to = "precip"
-    ) %>%
-    mutate(
-      Year = as.integer(Year),
-      Scenario = scenario_name
-    )
-  
-  all_grids_long[[scenario_name]] <- raster_long
+# Convert raster data to tidy data frame for visualization
+seasonal_df <- purrr::imap_dfr(seasonal_sums_cropped, function(r, name) {
+  df <- as.data.frame(r, xy = TRUE, na.rm = TRUE)
+  colnames(df)[3] <- "precip"
+  parts <- unlist(strsplit(name, "_"))
+  df$Scenario <- parts[1]
+  df$Season <- parts[2]
+  return(df)
+})
+
+# Faceted map of seasonal means
+sum_precip_per_season_scenario <- ggplot(
+  seasonal_df, aes(x = x, y = y, fill = precip)) +
+  geom_raster() +
+  facet_grid(Season ~ Scenario) +
+  scale_fill_viridis_c(
+    name = "Total Precip (mm)"
+  ) +
+  coord_sf() +
+  labs(title = "Total Precipitation per Season and Scenario") +
+  theme_minimal()
+
+sum_precip_per_season_scenario
+
+ggsave("Plots_Tables/sum_precip_per_season_scenario.png", 
+       plot = sum_precip_per_season_scenario, width = 10, height = 6, dpi = 300)
+
+# ## Summarize DJF mos only --------------------------------------------------
+
+# extract DJF winter layers and compute mean per year
+summarize_winter_djf <- function(rast, start_year) {
+  dates <- as.Date(time(rast))
+  months <- month(dates)
+  years <- year(dates)
+
+  # Dec of prev year, Jan + Feb of current year = winter
+  winter_ids <- which(months %in% c(12, 1, 2))
+  winter_stack <- rast[[winter_ids]]
+  winter_dates <- dates[winter_ids]
+  winter_months <- months[winter_ids]
+  winter_years <- years[winter_ids]
+
+  # Adjust Dec to the following year's winter
+  winter_years[winter_months == 12] <- winter_years[winter_months == 12] + 1
+
+  # For each winter year, average all layers (should be 3 per year)
+  winter_layers <- unique(winter_years)
+  winter_mean_list <- lapply(winter_layers, function(yr) {
+    idx <- which(winter_years == yr)
+    yr_stack <- winter_stack[[idx]]
+    yr_mean <- terra::app(yr_stack, fun = mean, na.rm = TRUE)
+    names(yr_mean) <- paste0("Winter_", yr)
+    return(yr_mean)
+  })
+
+  rast(winter_mean_list)
 }
 
-# Combine all into one big data frame
-grids_long_combined <- bind_rows(all_grids_long)
+# # Apply to each scenario
+winter_baseline <- summarize_winter_djf(baseline, start_year = 1850)
+winter_bad <- summarize_winter_djf(pred1, start_year = 2050)
+winter_ok  <- summarize_winter_djf(pred2, start_year = 2050)
+winter_good <- summarize_winter_djf(pred3, start_year = 2050)
 
-head(grids_long_combined)
+winter_scenarios <- list(
+  baseline = winter_baseline,
+  bad = winter_bad,
+  ok = winter_ok,
+  good = winter_good
+)
+# 
+# # Resample + crop to target grid
+winter_cropped <- purrr::imap(winter_scenarios, function(r, name) {
+  r_resampled <- terra::resample(r, target_raster, method = "bilinear")
+  r_cropped <- terra::mask(terra::crop(r_resampled, vect(AOI)), vect(AOI))
+  names(r_cropped) <- paste0(name, "_", gsub("Winter_", "", names(r_cropped)))
+  r_cropped
+})
 
-# Summary Stats -----------------------------------------------------------
 
-# other ideas: 
-# not use precipitation but other indices for grass growth?
+# Derive PrecipTimeseries Params ------------------------------------------
+# Identify pixels exhibiting highest interannual precipitation variability 
+# during DJF, using robust dispersion metrics to account for potential 
+# non-normality and outliers in relatively short-time frame climate model outputs
 
-## Pixel level -------------------------------------------------------------
+# Define robust standard deviation estimator
+robust_sd_90 <- function(x, na.rm = TRUE) {
+  q <- quantile(x, probs = c(0.05, 0.95), na.rm = na.rm)
+  ipr_90 <- q[2] - q[1]
+  return(ipr_90 / 3.29) # Converts 90% IPR to approximate robust SD assuming 
+  # Gaussian-like tails
+}
 
-scenarios <- c("bad", "ok", "good")
+# Extract time series from all pixels
+get_full_pixel_ts <- function(r, scenario_name) {
+  df <- as.data.frame(r, xy = TRUE, na.rm = TRUE)
+  df %>%
+    pivot_longer(cols = starts_with(scenario_name),
+                 names_to = "Year", values_to = "precip") %>%
+    mutate(
+      Year = as.integer(gsub(paste0(scenario_name, "_"), "", Year)),
+      Scenario = scenario_name
+    )
+}
 
-# Baseline / historic summary per pixel
-baseline_df <- grids_long_combined %>%
-  filter(Scenario == "baseline") %>%
-  group_by(x, y) %>%
+# Create long-format table of all pixels
+winter_ts <- purrr::imap_dfr(winter_cropped, get_full_pixel_ts)
+
+# Calculate interannual change statistics for DJF at each pixel
+winter_summary_table <- winter_ts %>%
+  group_by(Scenario, x, y) %>%
+  filter(mean(precip, na.rm = TRUE) > 3) %>% # Filter out low-precip pixels to 
+  # avoid inflated relative variability due to division by near-zero means
+  arrange(Year) %>%
+  mutate(
+    delta_precip = precip - lag(precip),
+    year_diff = Year - lag(Year)
+  ) %>%
+  filter(year_diff == 1) %>%
   summarize(
-    mean_bl = mean(precip, na.rm = TRUE),
-    sd_bl = sd(precip, na.rm = TRUE),
+    mean_precip_abs = mean(precip, na.rm = TRUE),
+    # sd_change = sd(delta_precip, na.rm = TRUE),
+    # sd_change_percent = sd_change / mean_precip_abs,
+    sd_change = robust_sd_90(delta_precip), # robust
+    sd_change_percent = sd_change / mean_precip_abs, # robust
     .groups = "drop"
   )
 
-# Function to compare each future scenario to baseline
-compare_to_baseline <- function(scn) {
-  scenario_df <- grids_long_combined %>%
-    filter(Scenario == scn) %>%
-    group_by(x, y) %>%
-    summarize(
-      mean_scn = mean(precip, na.rm = TRUE),
-      sd_scn = sd(precip, na.rm = TRUE),
-      .groups = "drop"
-    )
-  
-# Join with baseline
-  diff_df <- scenario_df %>%
-    left_join(baseline_df, by = c("x", "y")) %>%
-    mutate(
-      mean_diff = mean_scn - mean_bl,
-      sd_diff = sd_scn - sd_bl
-    )
-  
-# Aggregate across all pixels to get a single summary value
-  tibble(
-    Scenario = scn,
-    mean_diff_avg = mean((diff_df$mean_diff), na.rm = TRUE),
-    sd_diff_avg = mean((diff_df$sd_diff), na.rm = TRUE)
-  )
-}
+# Identify "worst-case" location, i.e., pixel with maximum interannual 
+# variability considering the 90 % IPR
+extreme_pixels <- winter_summary_table %>%
+  group_by(Scenario) %>%
+  slice_max(sd_change, n = 1) %>%
+  ungroup()
 
-# Run for all scenarios and bind results
-summary_table <- map_dfr(scenarios, compare_to_baseline)
+extreme_pixels
 
-summary_table <- summary_table %>%
-  rename(
-    `Mean Difference (Scenario - Baseline)` = mean_diff_avg,
-    `SD Difference (Scenario - Baseline)` = sd_diff_avg
-  )
-
-summary_table
-
-# Moran's i ---------------------------------------------------------------
-
-grids_sf <- sf::st_as_sf(grids_vect)
-
-points_sf <- grids_long_combined %>%
-  st_as_sf(coords = c("x", "y"), crs = st_crs(grids_sf))
-
-grids_with_precip <- st_join(points_sf, grids_sf, left = FALSE)
-
-# Prep result table
-years <- sort(unique(grids_with_precip$Year))
-scenarios <- unique(grids_with_precip$Scenario)
-moran_results <- expand.grid(Year = years, Scenario = scenarios, Moran_I = NA_real_)
-
-# Loop through year/scenario
-for (i in seq_len(nrow(moran_results))) {
-  yr <- moran_results$Year[i]
-  scn <- moran_results$Scenario[i]
-  
-  # Subset data
-  subset_vals <- grids_with_precip %>%
-    filter(Year == yr, Scenario == scn, !is.na(precip)) %>%
-    st_drop_geometry() %>%
-    group_by(Index) %>%
-    summarize(precip = mean(precip), .groups = "drop")
-  
-  # Join data to grid geometry
-  subset_sf <- grids_sf %>%
-    inner_join(subset_vals, by = "Index")
-  subset_sf <- st_as_sf(subset_sf)
-  
-  if (nrow(subset_sf) < 10) next
-  
-  # Create neighborhood structure
-  nb <- tryCatch(poly2nb(subset_sf, queen = TRUE), error = function(e) NULL)
-  if (is.null(nb) || all(card(nb) == 0)) next
-  
-  connected <- which(card(nb) > 0)
-  subset_sf <- subset_sf[connected, ]
-  nb <- poly2nb(subset_sf, queen = TRUE)
-  
-  # Spatial weights
-  lw <- nb2listw(nb, style = "W")
-  
-  # Moran's I
-  moran_test <- moran.test(subset_sf$precip, lw, alternative = "greater")
-  moran_results$Moran_I[i] <- moran_test$estimate[["Moran I statistic"]]
-}
-
-moran_table <- moran_results %>%
-  drop_na(Moran_I) %>%
-  group_by(Scenario, Year) %>%
-  summarize(mean_moran = mean(Moran_I), .groups = "drop")
-
-ggplot(moran_table, aes(x = mean_moran)) +
-  geom_histogram(binwidth = 0.001, fill = "steelblue", color = "white") +
-  facet_wrap(~ Scenario, scales = "free_y") +
-  labs(
-    title = "Distribution of Mean Moran's I by Scenario",
-    x = "Mean Moran's I",
-    y = "Frequency"
-  )
+write.csv(extreme_pixels, "Plots_Tables/scenario_rainstats.csv", row.names = FALSE)
 
