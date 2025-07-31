@@ -1,9 +1,9 @@
 
 
 
-PrecipTimeseries<-function(TimeSteps=50,StandardDev=0.2){
+PrecipTimeseries<-function(TimeSteps=50,scn_mean = 0, StandardDev=0.2){
   
-Change<-rnorm(n=TimeSteps,mean=0,sd=StandardDev)
+Change<-rnorm(n=TimeSteps,mean=scn_mean,sd=StandardDev)
 Rain<-terra::rast(rstack[["T0Rain"]]) #vectorize plots
 sim_rasters<-list()
 sim_rasters[[1]]<-Rain #Include t0 rain
@@ -11,6 +11,9 @@ for(i in 1:TimeSteps){
   
   r_sim <- Rain
   r_sim[]<-Rain[]+Change[i]*Rain[]
+  
+  r_sim[] <- pmax(r_sim[], 0) # if Rain is in 0–100 scale
+  
   sim_rasters[[(i+1)]] <- r_sim
 }
 
@@ -21,7 +24,9 @@ PrecipStack<-terra::as.polygons(PrecipStack,dissolve=FALSE)
 PrecipStack<-sf::st_as_sf(PrecipStack)
 
 names(PrecipStack)[1:(TimeSteps+1)]<-0:TimeSteps
-PrecipStack%>%tidyr::pivot_longer(cols=0:(TimeSteps+1),names_to = "Time",values_to = "Precip")%>%mutate(Time=as.integer(Time))
+PrecipStack <- PrecipStack%>%tidyr::pivot_longer(cols=0:(TimeSteps+1),
+                                                 names_to = "Time",
+                                                 values_to = "Precip")%>%mutate(Time=as.integer(Time))
 
 }
 
