@@ -1,5 +1,5 @@
 library(data.table)
-set.seed(123) # comment out for running many times
+# set.seed(123) # comment out for running many times
 Supplemental_fodder<-FALSE #does Cons grazing give supp food
 Set_Adoption<-TRUE #Is adoption of Conservation set at the starting number
 Forecasts<- "Everyone" #Can take values of "No_one", "Everyone", "Rich","Poor", "Conservation"
@@ -11,11 +11,57 @@ AnimalObservedValueRate<-0.1 #Multiplied by the economic value of animals and ad
 MaxGeneralSale<-0.99 #Maximum proportion of animals people can sell when NOT in conservation
 MaxConservationSale<-0.99 #Maximum proportion of animals people in conservation can sell
 AnimalBaseline<-2 #people never sell below this number
-TimeSteps<-50
-#Make rain data
-source("../RCode/MakeStylizedLandscape.R")
-source("../RCode/PrecipTimeseries.R")
-PrecipStack<-PrecipTimeseries(TimeSteps=TimeSteps,StandardDev=0.2)
+TimeSteps<-30
+
+
+# COSIMA: Testing different params for grass growth impact
+
+
+# Scenario
+n_reps <- 3
+AllSimResults <- list()
+scenarios <- c("baseline"
+               , "bad"
+               , "good"
+               , "ok"
+               )
+
+
+# run once
+# source("PredictedRainfall.R")
+# scn_sd <- setNames(
+#   round(extreme_pixels$sd_change_percent, 1),
+#   extreme_pixels$Scenario
+# )
+# 
+# scn_sd
+# bad baseline     good       ok 
+# 0.6      0.3      0.3      0.4 
+
+# COSIMA: change from hard-coded to version above
+scn_sd <- c(0.3, 0.6, 0.3, 0.4)
+scenarios <- c("baseline", "bad", "good", "ok")
+scn_sd <- setNames(scn_sd, scenarios)
+
+for (rep in 1:n_reps) {
+  ResultsList <- list()
+  
+  set.seed(123 
+           + rep
+           )
+  
+  for (target_scenario in scenarios) {
+    cat("Running scenario:", target_scenario, "\n")
+    
+    source("MakeStylizedLandscape.R")
+    
+    # Make change in rainfall
+    source("PrecipTimeseries.R")
+    
+    PrecipStack <- PrecipTimeseries(
+      TimeSteps = TimeSteps,
+      StandardDev = scn_sd[target_scenario]
+    )
 
 SummaryDat<-data.frame(Time=0,AvgMoney=mean(Ranchers$Money),
                        Gini = ineq::ineq(Ranchers$TotalEconomicWellbeing,type="Gini"),
@@ -24,7 +70,8 @@ SummaryDat<-data.frame(Time=0,AvgMoney=mean(Ranchers$Money),
                        AverageGrass = mean(rstack[["T0Grass"]][]),
                        TotalGrass = sum(rstack[["T0Grass"]][]),
                        PropCons = length(which(rstack[["Cons"]][]==T))/
-                         (N_Communities*N_Plots))
+                         (N_Communities*N_Plots),
+                       Scenario = target_scenario)
 
 
 #Get rid of some t0 variables
@@ -44,6 +91,8 @@ rstack <- rstack[[ -PopIndex ]]
 
 
 for(ts in 1:TimeSteps){
+  
+  cat("TimeSteps:", ts, "\n")
 
 
 RanchersPast<-Ranchers
@@ -233,7 +282,8 @@ new_behavior <- character(nrow(df2))
 behaviors <- df2$Conservation
 
 #Make payoffs for cows more observable
-payoffs <- df2$Mean_economic_wellbeing+(df2$stock_count*Animal_cost*AnimalObservedValueRate)
+payoffs <- df2$Mean_economic_wellbeing+(df2$stock_count*Animal_cost*
+                                          AnimalObservedValueRate)
 
 
 
@@ -432,7 +482,7 @@ df<-base::merge(df,NextGrass,by=c("CommID","PlotID"))
 #multiplier on current grass controls response to prexisting grass
 grass_growth <- function(current_grass, rain_quality, r_max = 300, K = 110) {
   # Logistic growth equation modified by rainfall
-  growth <- (r_max * (rain_quality / 100)) * current_grass*0.05 * (1 - current_grass / K)
+  growth <- (r_max * (rain_quality / 100)) * current_grass*0.01 * (1 - current_grass / K)
   # Update
   new_grass <- current_grass + growth
   # Ensure grass does not exceed carrying capacity and is positive
@@ -450,7 +500,7 @@ df$NextGrass<- grass_growth(current_grass = df$Grass, rain_quality = df$Precip)
 NextGrass<-df #Make an object so we can remake df without losing it
 
 #make the error in the forecast
-ForecastedGrass=rnorm(n=nrow(df), mean= df$NextGrass, sd= ForecastError )
+ForecastedGrass=rnorm(n=nrow(df), mean= df$NextGrass, sd= ForecastError)
 
 df$ForecastedGrass<-ForecastedGrass
   
@@ -472,9 +522,6 @@ Forecasters<-Forecasters%>%select(-ForecastedOptimalStrategy) #get rid of extra 
 
 Ranchers<-rbind(Forecasters,Learners)
 
-
-
-
 #Now need to actually buy/sell
 
 #There are two constraints 1) opportunity to sell and 2) money to buy
@@ -488,42 +535,90 @@ Ranchers$animals_before <- Ranchers$stock_count
 
 # Apply buying/selling logic
 Ranchers<- within(Ranchers, {
-  
+
   # Proposed change: positive (buy), negative (sell)
- 
-  proposed_change <- round(new_strategy  * stock_count )  # round to ensure whole animals
+
+  proposed_change <- round(new_strategy  * stock_count)  # round to ensure whole animals
   #Need to subtract the animals they already have, for addition only!
   proposed_change <- ifelse(proposed_change > 0, proposed_change - stock_count, proposed_change)
-  
+
   #for people that have 0, but want to buy, make 1.
   #could use a different number than 1 dependent on their money
   proposed_change[stock_count == 0 & new_strategy >= 0.5] <- 1
-  
+
   # --- Buying Logic ---
   buying <- proposed_change > 0
   max_affordable <- floor(Money / Animal_cost)  # maximum animals they can buy
   actual_change <- ifelse(buying, pmin(proposed_change, max_affordable), 0) #if buying, buy the smaller of what they want or what they can afford
-  
+
   # --- Selling Logic ---
   selling <- proposed_change < 0
   # Max proportion of herd allowed to sell
-  max_sell_prop <- ifelse(Conservation == 1, MaxConservationSale, MaxGeneralSale) #The max they can sell
-  max_sell <- floor(stock_count * max_sell_prop) #how many animals could they possibly sell
+  max_sell_prop <- ifelse(Conservation == 1, MaxConservationSale, MaxGeneralSale) #The max they can sell; COSIMA: short vector length, reason??
+  max_sell <- floor(stock_count * max_sell_prop) #how many animals could they possibly sell; COSIMA: max_sell_prop gets recycled?!
   allowed_sell <- pmax(stock_count - AnimalBaseline, 0) #If they have two or fewer animals, they wont sell
   max_allowed_sell <- pmin(max_sell, allowed_sell) #What could they sell, smaller # of allowed and able to
-  
+
   # Final selling change: negative integer, bounded
   sell_change <- pmax(proposed_change, -max_allowed_sell) #if they want to sell more than their max, don't allow
-  
+
   # Combine both
   actual_change[selling] <- sell_change[selling]
-  
+
   # Update animals and wealth
   stock_count <- stock_count + actual_change
   Money <- Money  - Animal_cost * actual_change  # Note: selling gives positive change to wealth
-  
+
   actual_animals_change <- actual_change
 })
+
+# ANDREAS/COSIMA: SUGGESTION FOR SMOOTH TRANSITION FROM FEW TO MANY COWS
+# define weights to balance relative social buying strategy and available money
+# dependent on the difference between the median cows of my community and my stock count
+# rough idea: "if they have many, and I can afford many, but currently have 0, I will buy a bit more than max 1"
+
+# Copy original animals for reference
+# Ranchers$animals_before <- Ranchers$stock_count
+# 
+# # define few / many cows cut-off as median of cows in the rancher's community
+# Ranchers$comm_median_cows <-
+#   ave(Ranchers$stock_count, Ranchers$CommID,
+#                                  FUN = function(x) median(x, na.rm = TRUE))
+# 
+# Ranchers<- within(Ranchers, {
+# 
+#   # Proposed change based on new strategy: positive (buy), negative (sell)
+# 
+#   # --- Buying Logic ---
+#   buying <- round(new_strategy) > 0
+#   max_affordable <- floor(Money / Animal_cost) # maximum animals they can buy
+#   w <- 1 / (1 + exp(comm_median_cows/2 - stock_count)) # COSIMA: potentially set median on tuning param list
+#   proposed_buy <- round(w * Ranchers$new_strategy * stock_count + (1 - w) * max_affordable)
+#   actual_buy <- ifelse(buying, pmin(proposed_buy, max_affordable), 0) #if buying, buy the smaller of what they want or what they can afford
+# 
+#   # --- Selling Logic ---
+#   selling <- round(Forecasters$new_strategy) < 0
+#   proposed_sell <- round(new_strategy  * stock_count)
+#   max_sell_prop <- ifelse(Conservation == 1, MaxConservationSale, MaxGeneralSale) #The max they can sell, Max proportion of herd allowed to sell
+#   max_sell <- floor(stock_count * max_sell_prop) #how many animals could they possibly sell
+#   allowed_sell <- pmax(stock_count - AnimalBaseline, 0) #If they have two or fewer animals, they wont sell
+#   max_allowed_sell <- pmin(max_sell, allowed_sell) #What could they sell, smaller # of allowed and able to
+#   actual_sell <- ifelse(selling, pmax(proposed_sell, -max_allowed_sell), 0)
+#   # # Final selling change: negative integer, bounded
+#   # sell_change <- pmax(proposed_change, -max_allowed_sell) #if they want to sell more than their max, don't allow
+#   # actual_change[selling] <- sell_change[selling]
+# 
+#   # Combine buy and sell changes
+#   actual_change <- actual_buy + actual_sell
+# 
+#   # Update animals and wealth
+#   stock_count <- stock_count + actual_change
+#   Money <- Money  - Animal_cost * actual_change  # Note: selling gives positive change to wealth
+# 
+#   actual_animals_change <- actual_change
+# })
+# 
+# Ranchers$comm_median_cows <- NULL
 
 Ranchers$PastStockChangeAnimal<-Ranchers$actual_animals_change 
 Ranchers$PastStockChangeProp <-Ranchers$actual_animals_change /Ranchers$animals_before
@@ -533,8 +628,24 @@ Ranchers$PastStockChangeProp<-ifelse(is.finite(Ranchers$PastStockChangeProp),Ran
 Ranchers$PastStockChangeProp<-ifelse(is.na(Ranchers$PastStockChangeProp),0,Ranchers$PastStockChangeProp)
 Ranchers$PastStock <-Ranchers$animals_before
 
-Ranchers<-Ranchers%>%select(-c(StockDeficit,new_strategy,animals_before,actual_animals_change,sell_change,max_allowed_sell,
-                     allowed_sell,max_sell,max_sell_prop,selling,actual_change,max_affordable,buying,proposed_change))
+Ranchers <- Ranchers %>% select(
+  -c(
+    StockDeficit,
+    new_strategy,
+    animals_before,
+    actual_animals_change,
+    # sell_change,
+    max_allowed_sell,
+    allowed_sell,
+    max_sell,
+    max_sell_prop,
+    selling,
+    actual_change,
+    max_affordable,
+    buying,
+    # proposed_change
+  )
+)
 
 
 #Make sure this is updated for the next round.
@@ -583,8 +694,13 @@ SummaryDat2<-data.frame(Time=ts,AvgMoney=mean(Ranchers$Money),
                          (N_Communities*N_Plots))
 
 
-SummaryDat<-rbind(SummaryDat,SummaryDat2)}
+SummaryDat2$Scenario <- target_scenario
+SummaryDat <- rbind(SummaryDat, SummaryDat2)
+ResultsList[[target_scenario]] <- SummaryDat
 
+}
+
+AllResults <- do.call(rbind, ResultsList)
 
 
 p1<-ggplot(SummaryDat,aes(x=Time,y=AvgMoney))+geom_line()+ggtitle("Money")
@@ -596,6 +712,72 @@ p4<-ggplot(SummaryDat,aes(x=Time,y=Gini))+geom_line()+ggtitle("Gini")
 
 #cowplot::plot_grid(p1, p2,p3,p4,p5)
 cowplot::plot_grid(p1, p2,p3,p4)
+
+ResultsList[[target_scenario]] <- SummaryDat
+  }
+  
+  
+  RepResults <- do.call(rbind, ResultsList)
+  RepResults$Rep <- rep
+  AllSimResults[[rep]] <- RepResults
+}
+
+AllSimResultsDF <- do.call(rbind, AllSimResults)
+
+
+SummaryStats <- AllSimResultsDF %>%
+  group_by(Scenario, Time) %>%
+  summarize(
+    AvgMoney_mean = mean(AvgMoney),
+    AvgMoney_sd = sd(AvgMoney),
+    AvgCows_mean = mean(AvgCows),
+    AvgCows_sd = sd(AvgCows),
+    AverageGrass_mean = mean(AverageGrass),
+    AverageGrass_sd = sd(AverageGrass),
+    Gini_mean = mean(Gini),
+    Gini_sd = sd(Gini),
+    .groups = "drop"
+  )
+
+
+p1 <- ggplot(AllResults, aes(x = Time, y = AvgMoney, color = Scenario)) +
+  geom_line() + ggtitle("Money")
+
+p2 <- ggplot(AllResults, aes(x = Time, y = AvgCows, color = Scenario)) +
+  geom_line() + ggtitle("Cows")
+
+p3 <- ggplot(AllResults, aes(x = Time, y = AverageGrass, color = Scenario)) +
+  geom_line() + ggtitle("Grass")
+
+p4 <- ggplot(AllResults, aes(x = Time, y = Gini, color = Scenario)) +
+  geom_line() + ggtitle("Gini")
+
+print(cowplot::plot_grid(p1, p2,p3,p4))
+
+
+p1 <- ggplot(SummaryStats, aes(x = Time, y = AvgMoney_mean, color = Scenario, fill = Scenario)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = AvgMoney_mean - AvgMoney_sd, ymax = AvgMoney_mean + AvgMoney_sd), alpha = 0.2, color = NA) +
+  ggtitle("Money")
+
+p2 <- ggplot(SummaryStats, aes(x = Time, y = AvgCows_mean, color = Scenario, fill = Scenario)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = AvgCows_mean - AvgCows_sd, ymax = AvgCows_mean + AvgCows_sd), alpha = 0.2, color = NA) +
+  ggtitle("Cows")
+
+p3 <- ggplot(SummaryStats, aes(x = Time, y = Gini_mean, color = Scenario, fill = Scenario)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = Gini_mean - Gini_sd, ymax = Gini_mean + Gini_sd), alpha = 0.2, color = NA) +
+  ggtitle("Gini")
+
+p4 <- ggplot(SummaryStats, aes(x = Time, y = AverageGrass_mean, color = Scenario, fill = Scenario)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = AverageGrass_mean - AverageGrass_sd, ymax = AverageGrass_mean + AverageGrass_sd), alpha = 0.2, color = NA) +
+  ggtitle("Grass")
+
+cowplot::plot_grid(p1, p2, p3, p4)
+
+
 
 
 
