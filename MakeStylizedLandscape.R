@@ -1,5 +1,5 @@
-source("../RCode/DeprivationDistribution.R")
-set.seed(123)
+source("DeprivationDistribution.R")
+# set.seed(123)
 #This landscape will have 10 layers.
 #Among these layers, there are two distinct levels: community and individual plots
 
@@ -112,9 +112,11 @@ rPlotID <- raster::raster(mPlotID)
 #Make the t0 rain (grazing free grass cover) at each plot
 #First make grass growth without cows. This assumes that all land has same growing potential. Rain is the only determinant 
 #Grass takes number between StartingGrassMin and 1 
-source("../RCode/SpatialAutocorrelationRaster.R")
+source("SpatialAutocorrelationRaster.R")
 rT0Rain<-MakeAutoCorMat(dummyMatrix = rPlotID,target_I = Spatial_Autocorrelation_Rain) #This is normally distributed. We want to bound and make pois
+
 rT0Rain[]<- (rT0Rain[] - min(rT0Rain[])) / (max(rT0Rain[]) - min(rT0Rain[])) * (1 - StartingGrassMin) + StartingGrassMin
+
 rT0Rain[]<-floor(rT0Rain[]*100) #Make discrete
 raster::plot(rT0Rain)
 
@@ -132,7 +134,7 @@ rAnimal[]<-ceiling(rAnimal[]/4) #the disaggregation above effectively multiplies
 
 #Now we need to assign each plot as resting or not based on whether it's in a conservation area
 #Choose random. Later this will be the one with least grass, but not at start bc cows haven't grazed yet
-source("../RCode/GrazedBinarySimulation.R")
+source("GrazedBinarySimulation.R")
 #raster::plot(rGrazed) # Returns this raster with 1/4 of the conservation plots labeled as 0
 
 
@@ -157,18 +159,23 @@ df2<-merge(df2,CommAnimals,by="CommID")%>%
   dplyr::mutate(t0Grass=ceiling(t0Rain-(GrassPerCow*Animal)))%>% #cows eat
   dplyr:: mutate(t0Grass=ifelse(t0Grass<=0,1,t0Grass)) #don't let grass go all the way to 0
 
+# df$t0Grass<-NA
+# for(i in 1:nrow(df)){
+#   if(df[i,]$Grazed==1){ #If it was grazed
+#     Community<-df[i,]$CommID #for each community
+#     Community2<-df2%>%dplyr::filter(CommID==Community)
+#     df[i,]$t0Grass<-ceiling((Community2$t0Grass)/Community2$n) #Split the total grass by the number of grazed pxels
+#   }
+#   if(df[i,]$Grazed==0){ 
+#     df[i,]$t0Grass<-df[i,]$T0Rain
+#   }}
 
+# COSIMA: Substituted loop with vectorized solution
+df <- df %>%
+  left_join(df2 %>% select(CommID, t0Grass, n), by = "CommID") %>%
+  mutate(t0Grass = ifelse(Grazed == 1, ceiling(t0Grass / n), T0Rain)) %>%
+  select(-n)
 
-df$t0Grass<-NA
-for(i in 1:nrow(df)){
-  if(df[i,]$Grazed==1){ #If it was grazed
-    Community<-df[i,]$CommID #for each community
-    Community2<-df2%>%dplyr::filter(CommID==Community)
-    df[i,]$t0Grass<-ceiling((Community2$t0Grass)/Community2$n) #Split the total grass by the number of grazed pxels
-  }
-  if(df[i,]$Grazed==0){ 
-    df[i,]$t0Grass<-df[i,]$T0Rain
-  }}
 
 rT0Grass <- rasterFromXYZ(df[, c("x", "y", "t0Grass")])
 raster::plot(rT0Grass)
