@@ -1,20 +1,61 @@
 library(data.table)
-# set.seed(123) # comment out for running many times
+
+if (!dir.exists("Plots_Tables")) {
+  dir.create("Plots_Tables")
+}
+
+# Experimental programmatic conditions
 Supplemental_fodder<-FALSE #does Cons grazing give supp food
 Set_Adoption<-TRUE #Is adoption of Conservation set at the starting number
-Forecasts<- "Everyone" #Can take values of "No_one", "Everyone", "Rich","Poor", "Conservation"
+Forecasts<- "No_one" #Can take values of "No_one", "Everyone", "Rich","Poor", "Conservation"
 ForecastError<-0 #How wrong are forecasts.#basically ranges 0:100
-Fodder_Price_Per_Cow<-200000 #play with this. Set high to essentially eliminate supplemental food buying from model
-CapitalGainRate<-1.02 #Financial gains from money in the bank
+Fodder_Price_Per_Cow<-1 #play with this. Set high to essentially eliminate supplemental food buying from model
+CapitalGainRate<-0.02 #Financial gains from money in the bank
 AnimalGainRate<- 0.02 # Financial gains from having animals (multiplied by the value of the animals and paid in cash)
-AnimalObservedValueRate<-0.1 #Multiplied by the economic value of animals and added to the observed economic wellbeing for social learning
-MaxGeneralSale<-0.99 #Maximum proportion of animals people can sell when NOT in conservation
-MaxConservationSale<-0.99 #Maximum proportion of animals people in conservation can sell
+AnimalObservedValueRate<-0.5 #Multiplied by the economic value of animals and added to the observed economic wellbeing for social learning
+MaxGeneralSale<-0.25 #Maximum proportion of animals people can sell when NOT in conservation
+MaxConservationSale<-0.50 #Maximum proportion of animals people in conservation can sell
 AnimalBaseline<-2 #people never sell below this number
-TimeSteps<-30
+TimeSteps<-100
+
+# Without interventions
+exp_setting <- "no_intervention" # using this for saving the plots with different names
+
+# Distribution of supplemental fodder (overwrite)
+# exp_setting <- "supplemental_fodder"
+# Supplemental_fodder<-TRUE #does Cons grazing give supp food
+# 
+# # Voluntary adoption/abandonment of conservation
+# exp_setting <- "adoption_abandonment_conservation"
+# Set_Adoption<-FALSE #Is adoption of Conservation set at the starting number
+# 
+# # Distribution of weather forecasts under no forecast error
+# exp_setting <- "forecast_distribution_everyone"
+# Forecasts<- "Everyone"
+# 
+# exp_setting <- "forecast_distribution_rich"
+# Forecasts<- "Rich"
+# 
+# exp_setting <- "forecast_distribution_poor"
+# Forecasts<- "Poor"
+# 
+# exp_setting <- "forecast_distribution_conservation"
+# Forecasts<- "Conservation"
+
+# Distribution of weather forecast under 80 % accuracy (20 error)
+# exp_setting <- "forecast_distribution_rich_acc80"
+# Forecasts<- "Rich"
+# ForecastError<-20
 
 
-# COSIMA: Testing different params for grass growth impact
+# exp_setting <- "forecast_distribution_poor_acc80"
+# Forecasts<- "Poor"
+# ForecastError<-20
+
+
+# exp_setting <- "forecast_distribution_conservation_acc80"
+# Forecasts<- "Conservation"
+# ForecastError<-20
 
 
 # Scenario
@@ -39,8 +80,7 @@ scenarios <- c("baseline"
 # 0.6      0.3      0.3      0.4 
 
 # COSIMA: change from hard-coded to version above
-scn_sd <- c(0.3, 0.6, 0.3, 0.4)
-scenarios <- c("baseline", "bad", "good", "ok")
+scn_sd <- c(0.3, 1, 0.3, 0.4)
 scn_sd <- setNames(scn_sd, scenarios)
 
 for (rep in 1:n_reps) {
@@ -59,7 +99,6 @@ for (rep in 1:n_reps) {
     source("PrecipTimeseries.R")
     
     PrecipStack <- PrecipTimeseries(
-      TimeSteps = TimeSteps,
       StandardDev = scn_sd[target_scenario]
     )
 
@@ -67,7 +106,7 @@ SummaryDat<-data.frame(Time=0,AvgMoney=mean(Ranchers$Money),
                        Gini = ineq::ineq(Ranchers$TotalEconomicWellbeing,type="Gini"),
                        AvgCows = mean(Ranchers$stock_count),
                        TotalCows = sum(Ranchers$stock_count),
-                       AverageGrass = mean(rstack[["T0Grass"]][]),
+                       AvgGrass = mean(rstack[["T0Grass"]][]),
                        TotalGrass = sum(rstack[["T0Grass"]][]),
                        PropCons = length(which(rstack[["Cons"]][]==T))/
                          (N_Communities*N_Plots),
@@ -145,8 +184,6 @@ rstack <- rstack[[ -GrassIndex ]]
 
 #Add new grass
 rstack<-stack(rstack,rGrass)
-
-
 
 
 ######Module 2 - Supplemental fodder#####
@@ -480,17 +517,23 @@ df<-base::merge(df,NextGrass,by=c("CommID","PlotID"))
 # new fct with linear effect of rain quality (for grass growth) on grass growth
 #played with these parameters. r_max controls response to rain. 
 #multiplier on current grass controls response to prexisting grass
-grass_growth <- function(current_grass, rain_quality, r_max = 300, K = 110) {
+# max_rain_quality <- max(PrecipStack$Precip)
+grass_growth <- function(current_grass, 
+                         rain_quality, 
+                         r_max = 300,
+                         # maxPrecip,
+                         K = 100) {
+
   # Logistic growth equation modified by rainfall
-  growth <- (r_max * (rain_quality / 100)) * current_grass*0.01 * (1 - current_grass / K)
+  # growth <- rain_effect * current_grass * 0.01 * (1 - current_grass / K)
+  growth <- (r_max * (rain_quality / 100)) * current_grass * 0.01 * (1 - current_grass / K)
   # Update
   new_grass <- current_grass + growth
   # Ensure grass does not exceed carrying capacity and is positive
-  new_grass <- pmin(new_grass, K)
+  # new_grass <- pmin(new_grass, K)
   new_grass <- pmax(new_grass, 0)
   new_grass
 }
-
 
 # Update grass level. Note that this is NOT additive! but next grass is highly dependent on past 
 df$NextGrass<- grass_growth(current_grass = df$Grass, rain_quality = df$Precip)
@@ -501,8 +544,8 @@ NextGrass<-df #Make an object so we can remake df without losing it
 
 #make the error in the forecast
 ForecastedGrass=rnorm(n=nrow(df), mean= df$NextGrass, sd= ForecastError)
-
 df$ForecastedGrass<-ForecastedGrass
+rm(ForecastedGrass)
   
 df2<-df%>%group_by(CommID)%>%
   summarise(
@@ -540,7 +583,7 @@ Ranchers<- within(Ranchers, {
 
   proposed_change <- round(new_strategy  * stock_count)  # round to ensure whole animals
   #Need to subtract the animals they already have, for addition only!
-  proposed_change <- ifelse(proposed_change > 0, proposed_change - stock_count, proposed_change)
+  # proposed_change <- ifelse(proposed_change > 0, proposed_change - stock_count, proposed_change)
 
   #for people that have 0, but want to buy, make 1.
   #could use a different number than 1 dependent on their money
@@ -670,7 +713,6 @@ rstack<-stack(rstack,ranimals)
 #of the specific simulation and following a logistic growth curve. 
 
 
-
 df<-raster::as.data.frame(rstack,xy=T)
 df<-df%>%select(-Grass)
 NextGrass<-NextGrass[c("x","y","NextGrass")]
@@ -688,7 +730,7 @@ SummaryDat2<-data.frame(Time=ts,AvgMoney=mean(Ranchers$Money),
                         Gini = ineq::ineq(Ranchers$TotalEconomicWellbeing,type="Gini"),
                        AvgCows = mean(Ranchers$stock_count),
                        TotalCows = sum(Ranchers$stock_count),
-                       AverageGrass = mean(rstack[["Grass"]][]),
+                       AvgGrass = mean(rstack[["Grass"]][]),
                        TotalGrass = sum(rstack[["Grass"]][]),
                        PropCons = length(which(rstack[["Cons"]][]==T))/
                          (N_Communities*N_Plots))
@@ -705,7 +747,7 @@ AllResults <- do.call(rbind, ResultsList)
 
 p1<-ggplot(SummaryDat,aes(x=Time,y=AvgMoney))+geom_line()+ggtitle("Money")
 p2<-ggplot(SummaryDat,aes(x=Time,y=AvgCows))+geom_line()+ggtitle("Cows")
-p3<-ggplot(SummaryDat,aes(x=Time,y=AverageGrass))+geom_line()+ggtitle("Grass")
+p3<-ggplot(SummaryDat,aes(x=Time,y=AvgGrass))+geom_line()+ggtitle("Grass")
 p4<-ggplot(SummaryDat,aes(x=Time,y=Gini))+geom_line()+ggtitle("Gini")
 #is set conservation = FALSE
 #p5<-ggplot(SummaryDat,aes(x=Time,y=PropCons))+geom_line()+ggtitle("Cons") 
@@ -732,8 +774,8 @@ SummaryStats <- AllSimResultsDF %>%
     AvgMoney_sd = sd(AvgMoney),
     AvgCows_mean = mean(AvgCows),
     AvgCows_sd = sd(AvgCows),
-    AverageGrass_mean = mean(AverageGrass),
-    AverageGrass_sd = sd(AverageGrass),
+    AvgGrass_mean = mean(AvgGrass),
+    AvgGrass_sd = sd(AvgGrass),
     Gini_mean = mean(Gini),
     Gini_sd = sd(Gini),
     .groups = "drop"
@@ -746,14 +788,13 @@ p1 <- ggplot(AllResults, aes(x = Time, y = AvgMoney, color = Scenario)) +
 p2 <- ggplot(AllResults, aes(x = Time, y = AvgCows, color = Scenario)) +
   geom_line() + ggtitle("Cows")
 
-p3 <- ggplot(AllResults, aes(x = Time, y = AverageGrass, color = Scenario)) +
+p3 <- ggplot(AllResults, aes(x = Time, y = AvgGrass, color = Scenario)) +
   geom_line() + ggtitle("Grass")
 
 p4 <- ggplot(AllResults, aes(x = Time, y = Gini, color = Scenario)) +
   geom_line() + ggtitle("Gini")
 
 print(cowplot::plot_grid(p1, p2,p3,p4))
-
 
 p1 <- ggplot(SummaryStats, aes(x = Time, y = AvgMoney_mean, color = Scenario, fill = Scenario)) +
   geom_line() +
@@ -770,14 +811,22 @@ p3 <- ggplot(SummaryStats, aes(x = Time, y = Gini_mean, color = Scenario, fill =
   geom_ribbon(aes(ymin = Gini_mean - Gini_sd, ymax = Gini_mean + Gini_sd), alpha = 0.2, color = NA) +
   ggtitle("Gini")
 
-p4 <- ggplot(SummaryStats, aes(x = Time, y = AverageGrass_mean, color = Scenario, fill = Scenario)) +
+p4 <- ggplot(SummaryStats, aes(x = Time, y = AvgGrass_mean, color = Scenario, fill = Scenario)) +
   geom_line() +
-  geom_ribbon(aes(ymin = AverageGrass_mean - AverageGrass_sd, ymax = AverageGrass_mean + AverageGrass_sd), alpha = 0.2, color = NA) +
+  geom_ribbon(aes(ymin = AvgGrass_mean - AvgGrass_sd, ymax = AvgGrass_mean + AvgGrass_sd), alpha = 0.2, color = NA) +
   ggtitle("Grass")
 
-cowplot::plot_grid(p1, p2, p3, p4)
+combined_plot <- cowplot::plot_grid(p1, p2, p3, p4)
 
+combined_plot
 
+ggsave(
+  filename = paste0("Plots_Tables/Combined_Plot_", exp_setting, ".png"),
+  plot = combined_plot,
+  width = 10, height = 8, dpi = 300
+)
 
-
+# Save the summary statistics table as CSV
+write.csv(SummaryStats, paste0("Plots_Tables/SummaryStats_", exp_setting, ".csv"), row.names = FALSE)
+write.csv(AllSimResultsDF, paste0("Plots_Tables/AllSimResultsDF_", exp_setting, ".csv"), row.names = FALSE)
 
