@@ -4,8 +4,21 @@ if (!dir.exists("Plots_Tables")) {
   dir.create("Plots_Tables")
 }
 
+# Stylized landscape control parameters
+N_Communities<-100 #Must be perfect square number and a multiple of the number of plots for the code below to work. 
+N_Plots<-4 #Must be perfect square number for the code below to work. 
+Starting_Prop_Conservation<-.1
+StartingGrassMin<-0.2#lower bound of grass/rain. i.e., the worst areas have 20% of the best (before grazing)
+Spatial_Autocorrelation_Rain<-0.98 # this affects the spatial autocorelation of grass growth (0 is fully random, 1 is completely determined by space)
+Animal_cost<-5 #Price of animals. Used for buying/selling and also financial gains from having animals
+GrassPerCow<-0.15 # will need to play with this
+Min_cows<-2 #min cows per person
+Cow_Inequality<-1 #exponential rate for within-community cattle distribution. higher numbers = more EQUAL
+Econ_Inequality<-0.1 # Scalar, lower number = less within-community inequality (centered at community mean)
+
+
 # Experimental programmatic conditions
-Supplemental_fodder<-FALSE #does Cons grazing give supp food
+Supplemental_fodder<-TRUE #does Cons grazing give supp food
 Set_Adoption<-TRUE #Is adoption of Conservation set at the starting number
 Forecasts<- "No_one" #Can take values of "No_one", "Everyone", "Rich","Poor", "Conservation"
 ForecastError<-0 #How wrong are forecasts.#basically ranges 0:100
@@ -18,8 +31,12 @@ MaxConservationSale<-0.50 #Maximum proportion of animals people in conservation 
 AnimalBaseline<-2 #people never sell below this number
 TimeSteps<-100
 
-# Without interventions
+# Without interventions (25% conservation)
 exp_setting <- "no_intervention" # using this for saving the plots with different names
+
+# everyone does conservation
+# Forecasts<- "Conservation" #Can take values of "No_one", "Everyone", "Rich","Poor", "Conservation"
+# Starting_Prop_Conservation<-1
 
 # Distribution of supplemental fodder (overwrite)
 # exp_setting <- "supplemental_fodder"
@@ -61,11 +78,11 @@ exp_setting <- "no_intervention" # using this for saving the plots with differen
 # Scenario
 n_reps <- 3
 AllSimResults <- list()
-scenarios <- c("baseline"
-               , "bad"
-               , "good"
-               , "ok"
-               )
+scenarios <- c(
+  "bad",
+  "ok",
+  "baseline",
+  "good")
 
 
 # run once
@@ -74,19 +91,14 @@ scenarios <- c("baseline"
 #   round(extreme_pixels$sd_change_percent, 1),
 #   extreme_pixels$Scenario
 # )
-# 
-# scn_sd
-# bad baseline     good       ok 
-# 0.6      0.3      0.3      0.4 
-
 # COSIMA: change from hard-coded to version above
-scn_sd <- c(0.3, 1, 0.3, 0.4)
+scn_sd <- c(1, 0.4 , 0.3, 0.3)
 scn_sd <- setNames(scn_sd, scenarios)
 
 for (rep in 1:n_reps) {
   ResultsList <- list()
   
-  set.seed(123 
+  set.seed(123
            + rep
            )
   
@@ -101,6 +113,7 @@ for (rep in 1:n_reps) {
     PrecipStack <- PrecipTimeseries(
       StandardDev = scn_sd[target_scenario]
     )
+    
 
 SummaryDat<-data.frame(Time=0,AvgMoney=mean(Ranchers$Money),
                        Gini = ineq::ineq(Ranchers$TotalEconomicWellbeing,type="Gini"),

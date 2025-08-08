@@ -20,19 +20,6 @@ source("DeprivationDistribution.R")
 #There are also an associated data frames: Ranchers
 #The 'Ranchers' data frame tracks the community, grazing behavior, cattle buying/selling behavior, and income of each person
 
-
-#Set control parameters
-N_Communities<-100 #Must be perfect square number and a multiple of the number of plots for the code below to work. 
-N_Plots<-4 #Must be perfect square number for the code below to work. 
-Starting_Prop_Conservation<-0.25
-StartingGrassMin<-0.2#lower bound of grass/rain. i.e., the worst areas have 20% of the best (before grazing)
-Spatial_Autocorrelation_Rain<-0.98 # this affects the spatial autocorelation of grass growth (0 is fully random, 1 is completely determined by space)
-Animal_cost<-5 #Price of animals. Used for buying/selling and also financial gains from having animals
-GrassPerCow<-0.15 # will need to play with this
-Min_cows<-2 #min cows per person
-Cow_Inequality<-1 #exponential rate for within-community cattle distribution. higher numbers = more EQUAL
-Econ_Inequality<-0.1 # Scalar, lower number = less within-community inequality (centered at community mean)
-
 #Make community IDs
 mCommID<-matrix(1:(N_Communities),nrow=sqrt(N_Communities))
 rCommID <- raster::raster(mCommID)
@@ -172,9 +159,9 @@ df2<-merge(df2,CommAnimals,by="CommID")%>%
 
 # COSIMA: Substituted loop with vectorized solution
 df <- df %>%
-  left_join(df2 %>% select(CommID, t0Grass, n), by = "CommID") %>%
-  mutate(t0Grass = ifelse(Grazed == 1, ceiling(t0Grass / n), T0Rain)) %>%
-  select(-n)
+  dplyr::left_join(df2[, c("CommID", "t0Grass", "n")], by = "CommID") %>%
+  dplyr::mutate(t0Grass = ifelse(Grazed == 1, ceiling(t0Grass / n), T0Rain)) %>%
+  dplyr::select(-n)
 
 
 rT0Grass <- rasterFromXYZ(df[, c("x", "y", "t0Grass")])
