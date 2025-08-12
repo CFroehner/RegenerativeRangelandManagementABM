@@ -2,6 +2,7 @@ library(dplyr)
 library(ggplot2)
 library(tidyverse)
 library(cowplot)
+library(ggh4x)
 
 if (!dir.exists("Manuscript_Vis")) {
   dir.create("Manuscript_Vis")
@@ -79,6 +80,9 @@ AllSimResultsDF$Supplemental_fodder        <- Supplemental_fodder
 AllSimResultsDF$Starting_Prop_Conservation <- Starting_Prop_Conservation
 AllSimResultsDF$ForecastError              <- ForecastError
 
+# Append to the combined df
+df_full <- rbind(df_full, AllSimResultsDF)
+
 # Vis 1: ABM Timeseries ---------------------------------------------------
 
 # Summarize the different runs per scenario and timestep
@@ -96,9 +100,6 @@ SummaryStats <- AllSimResultsDF %>%
     ),
     .groups = "drop"
   )
-
-# Append to the combined df
-df_full <- rbind(df_full, SummaryStats)
 
 # Facet plots
 p1 <- ggplot(SummaryStats, aes(Time, AvgMoney_mean, color = Scenario, fill = Scenario)) +
@@ -177,26 +178,123 @@ ggsave(
   width = 10, height = 8, dpi = 300
 )
 
-# Vis 2: ABM Outcomes -------------------------------------------------------
+# # Vis 2: ABM Outcomes -------------------------------------------------------
+# 
+# # Select timesteps from after the equilibrium is reached
+# # (Timeseries plot shows approx. last 30 ts)
+# post_burnin_df <- AllSimResultsDF %>%
+#   group_by(Scenario, Rep) %>%
+#   filter(Time >= max(Time) - 29) %>% # final 30 ts
+#   ungroup()
+# 
+# # Define main outcome variables
+# vars_to_normalize <- c("AvgMoney", "AvgCows", "AvgGrass", "Gini")
+# 
+# # Compute SSP2-4.5 median (normalizing by it / benchmark)
+# ok_median <- post_burnin_df %>%
+#   filter(Scenario == "SSP2-4.5") %>%
+#   summarise(across(all_of(vars_to_normalize), median, na.rm = TRUE))
+# 
+# # Normalize by dividing each variable by SSP2-4.5 median
+# normalized_df <- post_burnin_df %>%
+#   mutate(across(all_of(vars_to_normalize),
+#                 ~ . / ok_median[[cur_column()]],
+#                 .names = "{.col}_normalized"))
+# 
+# # Reshape for plotting
+# plot_df <- normalized_df %>%
+#   pivot_longer(cols = ends_with("_normalized"),
+#                names_to = "Variable",
+#                values_to = "Value") %>%
+#   mutate(Variable = str_remove(Variable, "_normalized"),
+#          Scenario = factor(Scenario, levels = c("SSP1-2.6", "SSP2-4.5", "SSP5-8.5")))
+# 
+# 
+# # Coloured boxplot
+# ABMres_boxplot <- ggplot(plot_df, aes(x = Scenario, y = Value, fill = Scenario)) +
+#   geom_boxplot() +
+#   geom_hline(yintercept = 1, linetype = "dashed", color = "gray30") +
+#   facet_wrap(~ Variable, scales = "free_y") +
+#   scale_fill_manual(values = c(
+#     "SSP1-2.6"     = "#009E73",
+#     "SSP2-4.5"       = "#F0E442",
+#     "SSP5-8.5"      = "#D55E00"
+#   )) +
+#   labs(title = title_string,
+#        x = "Scenario",
+#        y = "Normalized Outcome (SSP2-4.5 median = 1)") +
+#   theme(legend.position = "none")
+# 
+# print(ABMres_boxplot)
+# 
+# ggsave(
+#   filename = paste0("Manuscript_Vis/ABMres_boxplot_", fname, ".png"),
+#   plot = ABMres_boxplot,
+#   width = 10, height = 8, dpi = 300
+# )
+# 
+# # Coloured violin plot
+# ABMres_violin <- ggplot(plot_df, aes(x = Scenario, y = Value, fill = Scenario)) +
+#   geom_violin() +
+#   geom_hline(yintercept = 1, linetype = "dashed", color = "black") +
+#   facet_wrap(~ Variable, scales = "free_y") +
+#   labs(title = title_string,
+#        x = "Scenario",
+#        y = "Normalized Outcome Value (SSP2-4.5 median = 1)")+
+#   scale_fill_manual(values = c(
+#     "SSP1-2.6"     = "#009E73",
+#     "SSP2-4.5"       = "#F0E442",
+#     "SSP5-8.5"      = "#D55E00"
+#   )) + theme(legend.position = "none")
+# 
+# print(ABMres_violin)
+# 
+# ggsave(
+#   filename = paste0("Manuscript_Vis/ABMres_violin_", fname, ".png"),
+#   plot = ABMres_violin,
+#   width = 10, height = 8, dpi = 300
+# )
+}
 
-# Select timesteps from after the equilibrium is reached
-# (Timeseries plot shows approx. last 30 ts)
-post_burnin_df <- AllSimResultsDF %>%
-  group_by(Scenario, Rep) %>%
-  filter(Time >= max(Time) - 29) %>% # final 30 ts
-  ungroup()
+# Save combined dataframe of all outcome datasets post burn in phase
+df_full_last30 <- df_full %>%
+  filter(Time > max(Time) - 30) %>%
+  select(-c(TotalCows, TotalGrass, Time, Rep))
 
-# Define main outcome variables
-vars_to_normalize <- c("AvgMoney", "AvgCows", "AvgGrass", "Gini")
 
-# Compute SSP2-4.5 median (normalizing by it / benchmark)
-ok_median <- post_burnin_df %>%
+write.csv(
+  df_full_last30,
+  file = "CombinedData_PostBurnIN.csv",
+  row.names = FALSE
+)
+
+
+# Exp 1 -------------------------------------------------------------------
+# @Cosima / Matt: Check whether any differences between these 2
+# df_Exp1 <- read_csv("Ts_Data/FOREC_No_one_ADOP_FALSE_FODD_TRUE_PROPCONS_0.1_FORECERR_0.csv")
+# df_Exp1 <- read_csv("Ts_Data/FOREC_No_one_ADOP_FALSE_FODD_FALSE_PROPCONS_0.1_FORECERR_0.csv")
+
+# @Cosima / Matt: Explain y axis in these plots..?
+df_Exp1 <- read_csv("CombinedData_PostBurnIN.csv")
+df_Exp1 <- df_Exp1 %>%
+  dplyr::filter(
+    Forecasts == "No_one",
+    Set_Adoption == TRUE,
+    # Supplemental_fodder == TRUE, # @Matt:No real difference, would therefore go with FALSE?
+    Supplemental_fodder == FALSE,
+    Starting_Prop_Conservation == 0.1,
+    ForecastError==0
+  )
+
+outcome_vars <- c("AvgMoney", "AvgCows", "AvgGrass", "Gini")
+
+# Normalize both mean and sd columns by median outcome values in SSP2-4.5 scenario
+ok_median <- df_Exp1 %>%
   filter(Scenario == "SSP2-4.5") %>%
-  summarise(across(all_of(vars_to_normalize), median, na.rm = TRUE))
+  summarise(across(all_of(outcome_vars), median, na.rm = TRUE))
 
-# Normalize by dividing each variable by SSP2-4.5 median
-normalized_df <- post_burnin_df %>%
-  mutate(across(all_of(vars_to_normalize),
+normalized_df <- df_Exp1 %>%
+  mutate(across(all_of(outcome_vars),
                 ~ . / ok_median[[cur_column()]],
                 .names = "{.col}_normalized"))
 
@@ -208,9 +306,8 @@ plot_df <- normalized_df %>%
   mutate(Variable = str_remove(Variable, "_normalized"),
          Scenario = factor(Scenario, levels = c("SSP1-2.6", "SSP2-4.5", "SSP5-8.5")))
 
-
 # Coloured boxplot
-ABMres_boxplot <- ggplot(plot_df, aes(x = Scenario, y = Value, fill = Scenario)) +
+Exp1_boxplot <- ggplot(plot_df, aes(x = Scenario, y = Value, fill = Scenario)) +
   geom_boxplot() +
   geom_hline(yintercept = 1, linetype = "dashed", color = "gray30") +
   facet_wrap(~ Variable, scales = "free_y") +
@@ -219,25 +316,25 @@ ABMres_boxplot <- ggplot(plot_df, aes(x = Scenario, y = Value, fill = Scenario))
     "SSP2-4.5"       = "#F0E442",
     "SSP5-8.5"      = "#D55E00"
   )) +
-  labs(title = title_string,
+  labs(title = "Normalized Outcomes for No Intervention Setting",
        x = "Scenario",
        y = "Normalized Outcome (SSP2-4.5 median = 1)") +
   theme(legend.position = "none")
 
-print(ABMres_boxplot)
+print(Exp1_boxplot)
 
 ggsave(
-  filename = paste0("Manuscript_Vis/ABMres_boxplot_", fname, ".png"),
-  plot = ABMres_boxplot,
+  filename = paste0("Manuscript_Vis/Exp1_boxplot_", fname, ".png"),
+  plot = Exp1_boxplot,
   width = 10, height = 8, dpi = 300
 )
 
 # Coloured violin plot
-ABMres_violin <- ggplot(plot_df, aes(x = Scenario, y = Value, fill = Scenario)) +
+Exp1_violin <- ggplot(plot_df, aes(x = Scenario, y = Value, fill = Scenario)) +
   geom_violin() +
   geom_hline(yintercept = 1, linetype = "dashed", color = "black") +
   facet_wrap(~ Variable, scales = "free_y") +
-  labs(title = title_string,
+  labs(title = "Normalized Outcomes for No Intervention Setting",
        x = "Scenario",
        y = "Normalized Outcome Value (SSP2-4.5 median = 1)")+
   scale_fill_manual(values = c(
@@ -246,64 +343,47 @@ ABMres_violin <- ggplot(plot_df, aes(x = Scenario, y = Value, fill = Scenario)) 
     "SSP5-8.5"      = "#D55E00"
   )) + theme(legend.position = "none")
 
-print(ABMres_violin)
+print(Exp1_violin)
 
 ggsave(
-  filename = paste0("Manuscript_Vis/ABMres_violin_", fname, ".png"),
-  plot = ABMres_violin,
-  width = 10, height = 8, dpi = 300
-)
-}
+  filename = paste0("Manuscript_Vis/Exp1_violin_", fname, ".png"),
+  plot = Exp1_violin,
+  width = 10, height = 8, dpi = 300)
 
-# Save combined dataframe of all outcome datasets
-write.csv(
-  df_full,
-  file = paste0("CombinedData.csv"),
-  row.names = FALSE
-)
 
-# Vis 3: Effects of conservation interventions on outcomes --------------------
-# conservation interventions in different extents
+# Exp 2 -------------------------------------------------------------------
+# Effects of conservation interventions on outcomes (conservation interventions 
+# in different extents)
+# @COSIMA/MATT: Decide on type of interpolation, and error bars (max, min; 2SD; 1 SD etc.)
+# @COSIMA: consider normalizing by values per column?? Make y axis consistent wihtin columns
 
-df_full <- read_csv("CombinedData.csv")
+df_Exp2 <- read_csv("CombinedData_PostBurnIN.csv") %>%
+  dplyr::filter(
+    Forecasts %in% c("No_one", "Conservation"),
+    Set_Adoption == TRUE,
+    Supplemental_fodder %in% c(TRUE, FALSE),
+    Starting_Prop_Conservation %in% c(0.1, 0.25, 0.5, 0.75, 0.9),
+    ForecastError == 0
+  )
+outcome_vars <- c("AvgMoney", "AvgCows", "AvgGrass", "Gini")
 
-# Filter to forecasts for conservationists or no one (leave out strategies such as rich / poor and forecast accuracy for now)
-df_full <- df_full %>%
-  dplyr::filter(Forecasts %in% c("No_one", "Everyone")) %>% # @COSIMA: Change Everyone to Conservation as soon as data is available!!!
-  dplyr::filter(Set_Adoption == TRUE) %>% # allows to look at different intervention extents
-  dplyr::filter(ForecastError == 0)
-
-# take median across the post burn in time steps per setting
-# @Cosima ADD SD / IQR! (and also normalize!)
-df_full <- df_full %>%
-  dplyr::group_by(Scenario, Forecasts, Set_Adoption, Supplemental_fodder, 
-                  Starting_Prop_Conservation, ForecastError) %>%
-  summarise(across(ends_with("_mean"), ~ mean(.x, na.rm = TRUE)), .groups = "drop")
-
-vars_to_normalize <- c("AvgMoney_mean", "AvgCows_mean", "AvgGrass_mean", "Gini_mean")
-var_order <- c("AvgCows_mean", "AvgGrass_mean", "AvgMoney_mean", "Gini_mean")
-scenario_order <- c("SSP1-2.6", "SSP2-4.5", "SSP5-8.5")
-
-df_long <- df_full %>%
+df_long <- df_Exp2 %>%
   mutate(
-    # @COSIMA: Subsitute "Everyone" for "Conservation" as soon as data is available!!!
-    Forecasts_group = factor(Forecasts, levels = c("No_one", "Everyone")),
-    Scenario = factor(Scenario, levels = scenario_order)
+    Forecasts_group = factor(Forecasts, levels = c("No_one", "Conservation")),
+    Scenario = factor(Scenario)
   ) %>%
   pivot_longer(
-    cols = all_of(vars_to_normalize),
+    cols = all_of(outcome_vars),
     names_to = "Variable",
     values_to = "RawValue"
   )
 
-# normalize by no intervention per scenario x main variable
+# normalize by no intervention (no fodder, no forecast) per scenario and main variable
 baseline_df <- df_long %>%
-  # COSIMA: change to NO INTERVENTION Scenario as soon as respective data is available!!
-  # i.e., Supplemental_fodder == FALSE, Forecasts_group == "No_one"
-  filter(Supplemental_fodder == TRUE, Forecasts_group == "No_one") %>%
+  filter(Supplemental_fodder == FALSE, Forecasts_group == "No_one") %>%
   group_by(Scenario, Variable) %>%
   summarise(
-    Baseline = median(RawValue, na.rm = TRUE),
+    Baseline = median(RawValue, na.rm = TRUE), # normalizing by median
     .groups = "drop"
   )
 
@@ -312,110 +392,224 @@ df_long <- df_long %>%
   mutate(Value = RawValue / Baseline) %>%
   filter(is.finite(Value))
 
-ggplot(df_long, aes(x = Starting_Prop_Conservation, y = Value,
-                    color = Forecasts_group,
-                    linetype = Supplemental_fodder)) +
-  geom_hline(yintercept = 1, linetype = "dashed", linewidth = 0.3, color = "grey40") +
-  geom_point(alpha = 0.35, size = 0.7) +
-  geom_smooth(method = "loess", se = FALSE, linewidth = 0.7) +
-  facet_grid(rows = vars(Scenario), cols = vars(Variable), scales = "free_y") +
-  scale_color_brewer(palette = "Set1", drop = FALSE, name = "Forecasts") +
-  scale_linetype_manual(values = c("solid", "dotted"), drop = FALSE, name = "Supplemental fodder") +
+df_long
+
+## Option 1 using LOESS------------
+ggplot(df_long, aes(
+  x = Starting_Prop_Conservation, y = Value,
+  color = interaction(Forecasts_group, Supplemental_fodder, sep = ".", drop = TRUE)
+)) +
+  geom_hline(yintercept = 1, linetype = "dotted", linewidth = 0.3, color = "grey40") +
+  
+  # error bars at observed x: mean ± 2 SD
+  stat_summary(
+    fun.data = mean_sdl, fun.args = list(mult = 2),
+    geom = "errorbar", width = 0.02, linewidth = 0.6, lineend = "round",
+    na.rm = TRUE
+  ) +
+  
+  stat_summary(fun = mean, geom = "point", size = 1.2, na.rm = TRUE) +
+  
+  # error bars at observed x: mean ± 2 SD
+  # stat_summary(
+  #   fun.data = mean_sdl, fun.args = list(mult = 1),
+  #   geom = "errorbar", width = 0.02, linewidth = 0.6, lineend = "round",
+  #   na.rm = TRUE
+  # ) +
+  
+  # LOESS on the per-x group means (weighted by n) — inherits the combined color mapping
+  geom_smooth(
+    data = df_long %>%
+      group_by(
+        Scenario, Variable, Starting_Prop_Conservation,
+        Forecasts_group, Supplemental_fodder
+      ) %>%
+      summarise(mean = mean(Value, na.rm = TRUE),
+                n    = dplyr::n(), .groups = "drop"),
+    aes(y = mean, weight = n),
+    method = "loess", se = TRUE, linewidth = 0.9, span = 0.75
+  ) +
+  
+  ggh4x::facet_grid2(
+    rows = vars(Scenario),
+    cols = vars(Variable),
+    scales = "free_y",
+    independent = "y",
+    labeller = labeller(
+      Scenario = label_value,
+      Variable = function(x) sub("^Avg", "", x)
+    )
+  ) +
   theme(
     strip.background = element_rect(fill = "grey90"),
     strip.text = element_text(face = "bold"),
+    strip.placement = "outside",
     panel.grid.minor = element_blank(),
     legend.position = "bottom",
-    panel.spacing.x = unit(1.4, "lines")
+    panel.spacing.x = unit(1.4, "lines"),
+    axis.text.x = element_text(angle = 45, hjust = 1)
   ) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
   labs(
-    x = "Proportion Conservation (PropCons)",
-    y = "Value", # (normalized to baseline = median of No fodder + No forecasts in same Scenario & Variable)
-    title = "PropCons vs. Main Vars (Scenario-specific baseline)"
-  )
+    x = "Proportion Conservation",
+    y = "Value",
+    title = "Effect of Conservation Interventions on Outcomes under Different Climate Scenarios"
+  ) +
+  scale_color_manual(
+    name   = "Forecasts × Fodder",
+    breaks = c("Conservation.TRUE", "Conservation.FALSE",
+               "No_one.TRUE",      "No_one.FALSE"),
+    labels = c("Conservation + fodder",
+               "Conservation + no fodder",
+               "No one + fodder",
+               "No one + no fodder"),
+    values = c(
+      "Conservation.TRUE"  = "#1b9e77",
+      "Conservation.FALSE" = "#d95f02",
+      "No_one.TRUE"        = "#7570b3",
+      "No_one.FALSE"       = "#e7298a"
+    )
+  ) +
+  guides(color = guide_legend(order = 1))
 
-df_long <- df_long %>%
-  mutate(
-    Variable = factor(Variable, levels = var_order),
-    Scenario = factor(Scenario, levels = scenario_order)
-  )
-
-ggplot(df_long, aes(x = Starting_Prop_Conservation, y = Value,
-                    color = Forecasts_group, linetype = Supplemental_fodder)) +
+## Option 2 with Linear Interpolation-------
+ggplot(df_long, aes(
+  x = Starting_Prop_Conservation, y = Value,
+  color = interaction(Forecasts_group, Supplemental_fodder, sep = ".", drop = TRUE)
+)) +
   geom_hline(yintercept = 1, linetype = "dashed", linewidth = 0.3, color = "grey40") +
-  geom_point(alpha = 0.35, size = 0.7) +
-  geom_smooth(method = "loess", se = FALSE, linewidth = 0.7) +
-  facet_wrap(vars(Scenario, Variable),
-             scales = "free_y",        # <- frees y per panel
-             nrow = length(scenario_order)) +  # 3 rows (one per scenario)
-  scale_color_brewer(palette = "Set1", drop = FALSE, name = "Forecasts") +
-  scale_linetype_manual(values = c("solid", "dotted"), drop = FALSE, name = "Supplemental fodder") +
-  theme(strip.background = element_rect(fill = "grey90"),
-        strip.text = element_text(face = "bold"),
-        panel.grid.minor = element_blank(),
-        legend.position = "bottom",
-        panel.spacing.x = unit(1.4, "lines")) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  labs(x = "Proportion Conservation (PropCons)",
-       y = "Value (normalized to scenario × variable baseline)",
-       title = "PropCons vs. Main Vars (per-panel y-scales)")
+  
+  # error bars at observed x: mean ± 2 SD
+  stat_summary(
+    fun.data = mean_sdl, fun.args = list(mult = 2),
+    geom = "errorbar", width = 0.02, linewidth = 0.6, lineend = "round",
+    na.rm = TRUE
+  ) +
+  # mean points
+  stat_summary(fun = mean, geom = "point", size = 1.2, na.rm = TRUE) +
+  # piecewise-linear interpolation between means
+  stat_summary(fun = mean, geom = "line", linewidth = 0.9, na.rm = TRUE) +
+  
+  ggh4x::facet_grid2(
+    rows = vars(Scenario),
+    cols = vars(Variable),
+    scales = "free_y",
+    independent = "y",
+    labeller = labeller(
+      Scenario = label_value,
+      Variable = function(x) sub("^Avg", "", x)
+    )
+  ) +
+  theme(
+    strip.background = element_rect(fill = "grey90"),
+    strip.text = element_text(face = "bold"),
+    strip.placement = "outside",
+    panel.grid.minor = element_blank(),
+    legend.position = "bottom",
+    panel.spacing.x = unit(1.4, "lines"),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  ) +
+  labs(
+    x = "Proportion Conservation",
+    y = "Value",
+    title = "Effect of Conservation Interventions on Outcomes under Different Climate Scenarios"
+  ) +
+  scale_color_manual(
+    name   = "Forecasts × Fodder",
+    breaks = c("Conservation.TRUE", "Conservation.FALSE",
+               "No_one.TRUE",      "No_one.FALSE"),
+    labels = c("Conservation + fodder",
+               "Conservation + no fodder",
+               "No one + fodder",
+               "No one + no fodder"),
+    values = c(
+      "Conservation.TRUE"  = "#1b9e77",
+      "Conservation.FALSE" = "#d95f02",
+      "No_one.TRUE"        = "#7570b3",
+      "No_one.FALSE"       = "#e7298a"
+    )
+  ) +
+  guides(color = guide_legend(order = 1))
 
+# Exp 3 -------------------------------------------------------------------
 
-# Vis 4: Impact of programmatic decisions on outcomes (SSP2-4.5) --------------
-# Free Adoption
-# @COSIMA: find unique names for dfs per plot to ensure no overlap
+# Impact of programmatic decisions on outcomes
+df_Exp3 <- read_csv("CombinedData_PostBurnIN.csv") 
+df_Exp3 <- df_Exp3 %>%
+  dplyr::filter(
+    Forecasts %in% c("No_one", "Conservation"),
+    Set_Adoption == FALSE,
+    Supplemental_fodder %in% c(TRUE, FALSE),
+    Starting_Prop_Conservation == 0.25,
+    ForecastError==0
+  )
 
-df_full <- read_csv("CombinedData.csv")
+# Outcome var of interest
+outcome_vars <- c("PropCons")
 
-# Determine outcome variables of interest
-main_vars <- c(
-  "AvgMoney_mean",
-  "AvgCows_mean",
-  "Gini_mean",
-  "AvgGrass_mean",
-  "Starting_Prop_Conservation"
-)
+df_long <- df_Exp3 %>%
+  mutate(
+    Forecasts_group = factor(Forecasts, levels = c("No_one", "Conservation")),
+    Scenario = factor(Scenario)
+  ) %>%
+  pivot_longer(
+    cols = all_of(outcome_vars),
+    names_to = "Variable",
+    values_to = "RawValue"
+  )
 
-# Compute bottom baseline per facet, i.e., median of outcome variable under 
-# no forecasts and respective supplemental fodder setting
-baselines <- df_full %>%
-  dplyr::filter(Scenario == "SSP2-4.5",
-         Set_Adoption == TRUE, # @COSIMA: SWITCH TO FALSE once data is available!!!
-         Forecasts == "Everyone") %>%  # @COSIMA: SWITCH TO No_one once data is available!!!
-  dplyr::select(Supplemental_fodder, all_of(main_vars)) %>%
-  pivot_longer(cols = all_of(main_vars),
-               names_to = "Variable", values_to = "Value") %>%
-  group_by(Supplemental_fodder, Variable) %>%
-  summarise(median_baseline = median(Value, na.rm = TRUE), .groups = "drop")
+# normalize by no intervention (no fodder, no forecast) per scenario and main variable
+baseline_df <- df_long %>%
+  filter(Supplemental_fodder == FALSE, Forecasts_group == "No_one") %>%
+  group_by(Scenario, Variable) %>%
+  summarise(
+    Baseline = median(RawValue, na.rm = TRUE), # normalizing by median
+    .groups = "drop"
+  )
 
-plot_df <- df_full %>%
-  dplyr::filter(Scenario == "SSP2-4.5",
-         Set_Adoption == TRUE) %>% # COSIMA: SWITCH TO FALSE once data is available!!!
-  dplyr::select(Scenario, Forecasts, Supplemental_fodder, all_of(main_vars)) %>%
-  pivot_longer(cols = all_of(main_vars),
-               names_to = "Variable", values_to = "Value") %>%
-  left_join(baselines, by = c("Supplemental_fodder", "Variable")) %>%
-  mutate(Value_norm = Value / median_baseline,
-         Variable = factor(Variable,
-                           levels = main_vars,
-                           labels = c("AvgMoney_mean" = "AvgMoney",
-                                      "AvgCows_mean" = "AvgCows",
-                                      "Gini_mean" = "Gini",
-                                      "AvgGrass_mean" = "AvgGrass",
-                                      "Starting_Prop_Conservation" = "Start_Prop_Conservation")
-         ),
-         Supplemental_fodder = ifelse(Supplemental_fodder, "Fodder = TRUE", "Fodder = FALSE"))
+plot_df <- df_Exp3 %>%
+  dplyr::select(Scenario,Forecasts,Supplemental_fodder,all_of(outcome_vars)) %>%
+  pivot_longer(cols = all_of(outcome_vars),names_to = "Variable",values_to = "Value") %>%
+  left_join(baseline_df, by = c("Supplemental_fodder", "Variable")) %>%
+  dplyr::mutate(
+    Value = RawValue / median_baseline,
+    Variable = factor(
+      Variable,
+      levels = main_vars,
+      labels = c(
+        "AvgMoney_mean" = "Money",
+        "AvgCows_mean" = "Cows",
+        "Gini_mean" = "Gini",
+        "AvgGrass_mean" = "Grass",
+        "Starting_Prop_Conservation" = "Start_Prop_Conservation"
+      )
+    ),
+    Supplemental_fodder = ifelse(Supplemental_fodder, "Fodder = TRUE", "Fodder = FALSE")
+  )
 
-
-Programm_Effect_ssp245 <- ggplot(plot_df, aes(x = Forecasts, y = Value_norm, fill = Forecasts)) +
+Programm_Effect_ssp245 <- ggplot(plot_df, aes(x = Forecasts, y = Value, fill = Forecasts)) +
   geom_boxplot() +
   geom_hline(yintercept = 1, linetype = "dashed", color = "gray30") +
   facet_wrap(~ Supplemental_fodder + Variable, scales = "free_y", ncol = length(main_vars)) +
   scale_fill_brewer(palette = "Set2") +
-  labs(title = "Impact of programmatic decisions on outcomes (SSP2-4.5)",
+  labs(title = "Impact of programmatic decisions on outcomes",
        x = "Forecast",
        y = "Normalized Value (median of no forecasts = 1)") +
+  theme(legend.position = "none")
+
+# facetted by fodder and variable
+Programm_Effect_ssp245 <- ggplot(plot_df, aes(x = Forecasts, y = Value_norm, fill = Forecasts)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 1, linetype = "dashed", color = "gray30") +
+  facet_grid(
+    Scenario ~ Supplemental_fodder + Variable,
+    scales = "free_y"
+  ) +
+  # scale_fill_brewer(palette = "Set2") +
+  labs(
+    title = "Impact of programmatic decisions on outcomes (SSP2-4.5)",
+    x = "Forecast",
+    y = "Normalized Value (median of no forecasts = 1)"
+  ) +
   theme(legend.position = "none")
 
 Programm_Effect_ssp245
@@ -425,4 +619,5 @@ ggsave(
   plot = Programm_Effect_ssp245,
   width = 10, height = 8, dpi = 300
 )
+
 
