@@ -94,7 +94,6 @@ AllSimResults <- vector("list", n_reps)
 for (rep in 1:n_reps) {
   cat("  Rep:", rep, "\n")
   set.seed(123 + rep)
-  # ResultsList <- list()
   
   # Build T0 for this rep
   source("MakeStylizedLandscape.R")
@@ -636,54 +635,6 @@ for (rep in 1:n_reps) {
         actual_animals_change <- actual_change
       })
       
-      # ANDREAS/COSIMA: SUGGESTION FOR SMOOTH TRANSITION FROM FEW TO MANY COWS
-      # define weights to balance relative social buying strategy and available money
-      # dependent on the difference between the median cows of my community and my stock count
-      # rough idea: "if they have many, and I can afford many, but currently have 0, I will buy a bit more than max 1"
-      
-      # Copy original animals for reference
-      # Ranchers$animals_before <- Ranchers$stock_count
-      # 
-      # # define few / many cows cut-off as median of cows in the rancher's community
-      # Ranchers$comm_median_cows <-
-      #   ave(Ranchers$stock_count, Ranchers$CommID,
-      #                                  FUN = function(x) median(x, na.rm = TRUE))
-      # 
-      # Ranchers<- within(Ranchers, {
-      # 
-      #   # Proposed change based on new strategy: positive (buy), negative (sell)
-      # 
-      #   # --- Buying Logic ---
-      #   buying <- round(new_strategy) > 0
-      #   max_affordable <- floor(Money / Animal_cost) # maximum animals they can buy
-      #   w <- 1 / (1 + exp(comm_median_cows/2 - stock_count)) # COSIMA: potentially set median on tuning param list
-      #   proposed_buy <- round(w * Ranchers$new_strategy * stock_count + (1 - w) * max_affordable)
-      #   actual_buy <- ifelse(buying, pmin(proposed_buy, max_affordable), 0) #if buying, buy the smaller of what they want or what they can afford
-      # 
-      #   # --- Selling Logic ---
-      #   selling <- round(Forecasters$new_strategy) < 0
-      #   proposed_sell <- round(new_strategy  * stock_count)
-      #   max_sell_prop <- ifelse(Conservation == 1, MaxConservationSale, MaxGeneralSale) #The max they can sell, Max proportion of herd allowed to sell
-      #   max_sell <- floor(stock_count * max_sell_prop) #how many animals could they possibly sell
-      #   allowed_sell <- pmax(stock_count - AnimalBaseline, 0) #If they have two or fewer animals, they wont sell
-      #   max_allowed_sell <- pmin(max_sell, allowed_sell) #What could they sell, smaller # of allowed and able to
-      #   actual_sell <- ifelse(selling, pmax(proposed_sell, -max_allowed_sell), 0)
-      #   # # Final selling change: negative integer, bounded
-      #   # sell_change <- pmax(proposed_change, -max_allowed_sell) #if they want to sell more than their max, don't allow
-      #   # actual_change[selling] <- sell_change[selling]
-      # 
-      #   # Combine buy and sell changes
-      #   actual_change <- actual_buy + actual_sell
-      # 
-      #   # Update animals and wealth
-      #   stock_count <- stock_count + actual_change
-      #   Money <- Money  - Animal_cost * actual_change  # Note: selling gives positive change to wealth
-      # 
-      #   actual_animals_change <- actual_change
-      # })
-      # 
-      # Ranchers$comm_median_cows <- NULL
-      
       Ranchers$PastStockChangeAnimal<-Ranchers$actual_animals_change 
       Ranchers$PastStockChangeProp <-Ranchers$actual_animals_change /Ranchers$animals_before
       #If infinite (if they had 0 before and bought 1)
@@ -698,7 +649,7 @@ for (rep in 1:n_reps) {
           new_strategy,
           animals_before,
           actual_animals_change,
-          # sell_change,
+          sell_change,
           max_allowed_sell,
           allowed_sell,
           max_sell,
@@ -707,7 +658,7 @@ for (rep in 1:n_reps) {
           actual_change,
           max_affordable,
           buying,
-          # proposed_change
+          proposed_change
         )
       )
       
@@ -759,26 +710,11 @@ for (rep in 1:n_reps) {
       
       SummaryDat2$Scenario <- target_scenario
       SummaryDat <- rbind(SummaryDat, SummaryDat2)
-      # ResultsList[[target_scenario]] <- SummaryDat
       
     }
     
     SummaryDat
-    
-    # AllResults <- do.call(rbind, ResultsList)
-    
-    
-    # p1<-ggplot(SummaryDat,aes(x=Time,y=AvgMoney))+geom_line()+ggtitle("Money")
-    # p2<-ggplot(SummaryDat,aes(x=Time,y=AvgCows))+geom_line()+ggtitle("Cows")
-    # p3<-ggplot(SummaryDat,aes(x=Time,y=AvgGrass))+geom_line()+ggtitle("Grass")
-    # p4<-ggplot(SummaryDat,aes(x=Time,y=Gini))+geom_line()+ggtitle("Gini")
-    #is set conservation = FALSE
-    #p5<-ggplot(SummaryDat,aes(x=Time,y=PropCons))+geom_line()+ggtitle("Cons") 
-    
-    #cowplot::plot_grid(p1, p2,p3,p4,p5)
-    # cowplot::plot_grid(p1, p2,p3,p4)
-    # 
-    # ResultsList[[target_scenario]] <- SummaryDat
+
   }
   
   names(ResultsList) <- scenarios
@@ -788,7 +724,6 @@ for (rep in 1:n_reps) {
   
 }
 
-# AllSimResultsDF <- do.call(rbind, AllSimResults)
 # Combine all repetitions for this condition
 AllSimResultsDF <- data.table::rbindlist(AllSimResults, use.names = TRUE, fill = TRUE)
 
@@ -801,92 +736,3 @@ write.csv(AllSimResultsDF,
 
 stopCluster(cl)
 
-# # Visualizations ----------------------------------------------------------
-# 
-# SummaryStats <- AllSimResultsDF %>%
-#   group_by(Scenario, Time) %>%
-#   summarize(
-#     AvgMoney_mean = mean(AvgMoney),
-#     AvgMoney_sd = sd(AvgMoney),
-#     AvgCows_mean = mean(AvgCows),
-#     AvgCows_sd = sd(AvgCows),
-#     AvgGrass_mean = mean(AvgGrass),
-#     AvgGrass_sd = sd(AvgGrass),
-#     Gini_mean = mean(Gini),
-#     Gini_sd = sd(Gini),
-#     .groups = "drop"
-#   )
-# 
-# # Rename scenarios and set colouring
-# cols <- c(
-#   "SSP1-2.6" = "#009E73",
-#   "SSP2-4.5" = "#F0E442",
-#   "SSP5-8.5" = "#D55E00",
-#   "baseline" = "darkgrey"
-# )
-# 
-# SummaryStats <- SummaryStats %>%
-#   mutate(
-#     Scenario = recode(
-#       Scenario,
-#       "good"     = "SSP1-2.6",
-#       "ok"       = "SSP2-4.5",
-#       "bad"      = "SSP5-8.5",
-#       "baseline" = "baseline",
-#       .default   = Scenario
-#     ),
-#     Scenario = factor(Scenario, levels = names(cols))
-#   )
-# 
-# AllSimResultsDF <- AllSimResultsDF %>%
-#   mutate(
-#     Scenario = recode(
-#       Scenario,
-#       "good"     = "SSP1-2.6",
-#       "ok"       = "SSP2-4.5",
-#       "bad"      = "SSP5-8.5",
-#       "baseline" = "baseline",
-#       .default   = Scenario
-#     ),
-#     Scenario = factor(Scenario, levels = names(cols))
-#   )
-# 
-# scale_cols  <- scale_color_manual(values = cols, breaks = names(cols), drop = FALSE)
-# scale_fills <- scale_fill_manual(values = cols,  breaks = names(cols), drop = FALSE)
-# 
-# p1 <- ggplot(SummaryStats, aes(Time, AvgMoney_mean, color = Scenario, fill = Scenario)) +
-#   geom_line() +
-#   geom_ribbon(aes(ymin = AvgMoney_mean - AvgMoney_sd, ymax = AvgMoney_mean + AvgMoney_sd),
-#               alpha = 0.2, color = NA) +
-#   ggtitle("Money") + scale_cols + scale_fills + labs(color = "Scenario", fill = "Scenario")
-# 
-# p2 <- ggplot(SummaryStats, aes(Time, AvgCows_mean, color = Scenario, fill = Scenario)) +
-#   geom_line() +
-#   geom_ribbon(aes(ymin = AvgCows_mean - AvgCows_sd, ymax = AvgCows_mean + AvgCows_sd),
-#               alpha = 0.2, color = NA) +
-#   ggtitle("Cows") + scale_cols + scale_fills + labs(color = "Scenario", fill = "Scenario")
-# 
-# p3 <- ggplot(SummaryStats, aes(Time, Gini_mean, color = Scenario, fill = Scenario)) +
-#   geom_line() +
-#   geom_ribbon(aes(ymin = Gini_mean - Gini_sd, ymax = Gini_mean + Gini_sd),
-#               alpha = 0.2, color = NA) +
-#   ggtitle("Gini") + scale_cols + scale_fills + labs(color = "Scenario", fill = "Scenario")
-# 
-# p4 <- ggplot(SummaryStats, aes(Time, AvgGrass_mean, color = Scenario, fill = Scenario)) +
-#   geom_line() +
-#   geom_ribbon(aes(ymin = AvgGrass_mean - AvgGrass_sd, ymax = AvgGrass_mean + AvgGrass_sd),
-#               alpha = 0.2, color = NA) +
-#   ggtitle("Grass") + scale_cols + scale_fills + labs(color = "Scenario", fill = "Scenario")
-# 
-# combined_plot <- cowplot::plot_grid(p1, p2, p3, p4)
-# combined_plot
-# 
-# ggsave(
-#   filename = paste0("Plots_Tables/Combined_Plot_Parallel", exp_setting, ".png"),
-#   plot = combined_plot,
-#   width = 10, height = 8, dpi = 300
-# )
-# 
-# # Save the summary statistics table as CSV
-# write.csv(SummaryStats, paste0("Plots_Tables/SummaryStatsParallel_", exp_setting, ".csv"), row.names = FALSE)
-# write.csv(AllSimResultsDF, paste0("Plots_Tables/AllSimResultsDFParallel_", exp_setting, ".csv"), row.names = FALSE)
