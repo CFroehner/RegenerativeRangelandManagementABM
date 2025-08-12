@@ -282,7 +282,7 @@ Ranchers <- Ranchers%>%#dplyr::arrange(stock_count, decreasing = TRUE)%>%
 Ranchers<-Ranchers%>%
   mutate(Money=economic_wellbeing)%>%
   mutate(TotalEconomicWellbeing=Money+(stock_count *Animal_cost))%>%
-  select(-economic_wellbeing)
+  dplyr::select(-economic_wellbeing)
 
 #ggplot(Ranchers)+geom_histogram(aes(x=economic_wellbeing))+facet_wrap(~CommID)
 
