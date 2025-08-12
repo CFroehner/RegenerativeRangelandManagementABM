@@ -57,7 +57,7 @@ scn_sd <- setNames(c(1, 0.4,
 # )
 
 conditions <- readRDS("settings_1.rds") # Matt
-# settings_2 <- readRDS("settings_2.rds") # Cosima
+# conditions <- readRDS("settings_2.rds") # Cosima
 
 # Number of repetitions
 n_reps <- 50
