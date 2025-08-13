@@ -177,83 +177,6 @@ ggsave(
   plot = ABMTs_res,
   width = 10, height = 8, dpi = 300
 )
-
-# # Vis 2: ABM Outcomes -------------------------------------------------------
-# 
-# # Select timesteps from after the equilibrium is reached
-# # (Timeseries plot shows approx. last 30 ts)
-# post_burnin_df <- AllSimResultsDF %>%
-#   group_by(Scenario, Rep) %>%
-#   filter(Time >= max(Time) - 29) %>% # final 30 ts
-#   ungroup()
-# 
-# # Define main outcome variables
-# vars_to_normalize <- c("AvgMoney", "AvgCows", "AvgGrass", "Gini")
-# 
-# # Compute SSP2-4.5 median (normalizing by it / benchmark)
-# ok_median <- post_burnin_df %>%
-#   filter(Scenario == "SSP2-4.5") %>%
-#   summarise(across(all_of(vars_to_normalize), median, na.rm = TRUE))
-# 
-# # Normalize by dividing each variable by SSP2-4.5 median
-# normalized_df <- post_burnin_df %>%
-#   mutate(across(all_of(vars_to_normalize),
-#                 ~ . / ok_median[[cur_column()]],
-#                 .names = "{.col}_normalized"))
-# 
-# # Reshape for plotting
-# plot_df <- normalized_df %>%
-#   pivot_longer(cols = ends_with("_normalized"),
-#                names_to = "Variable",
-#                values_to = "Value") %>%
-#   mutate(Variable = str_remove(Variable, "_normalized"),
-#          Scenario = factor(Scenario, levels = c("SSP1-2.6", "SSP2-4.5", "SSP5-8.5")))
-# 
-# 
-# # Coloured boxplot
-# ABMres_boxplot <- ggplot(plot_df, aes(x = Scenario, y = Value, fill = Scenario)) +
-#   geom_boxplot() +
-#   geom_hline(yintercept = 1, linetype = "dashed", color = "gray30") +
-#   facet_wrap(~ Variable, scales = "free_y") +
-#   scale_fill_manual(values = c(
-#     "SSP1-2.6"     = "#009E73",
-#     "SSP2-4.5"       = "#F0E442",
-#     "SSP5-8.5"      = "#D55E00"
-#   )) +
-#   labs(title = title_string,
-#        x = "Scenario",
-#        y = "Normalized Outcome (SSP2-4.5 median = 1)") +
-#   theme(legend.position = "none")
-# 
-# print(ABMres_boxplot)
-# 
-# ggsave(
-#   filename = paste0("Manuscript_Vis/ABMres_boxplot_", fname, ".png"),
-#   plot = ABMres_boxplot,
-#   width = 10, height = 8, dpi = 300
-# )
-# 
-# # Coloured violin plot
-# ABMres_violin <- ggplot(plot_df, aes(x = Scenario, y = Value, fill = Scenario)) +
-#   geom_violin() +
-#   geom_hline(yintercept = 1, linetype = "dashed", color = "black") +
-#   facet_wrap(~ Variable, scales = "free_y") +
-#   labs(title = title_string,
-#        x = "Scenario",
-#        y = "Normalized Outcome Value (SSP2-4.5 median = 1)")+
-#   scale_fill_manual(values = c(
-#     "SSP1-2.6"     = "#009E73",
-#     "SSP2-4.5"       = "#F0E442",
-#     "SSP5-8.5"      = "#D55E00"
-#   )) + theme(legend.position = "none")
-# 
-# print(ABMres_violin)
-# 
-# ggsave(
-#   filename = paste0("Manuscript_Vis/ABMres_violin_", fname, ".png"),
-#   plot = ABMres_violin,
-#   width = 10, height = 8, dpi = 300
-# )
 }
 
 # Save combined dataframe of all outcome datasets post burn in phase
@@ -314,13 +237,15 @@ plot_df <- normalized_df %>%
 Exp1_boxplot <- ggplot(plot_df, aes(x = Scenario, y = Value, fill = Scenario)) +
   geom_boxplot() +
   geom_hline(yintercept = 1, linetype = "dashed", color = "gray30") +
-  facet_wrap(~ Variable, scales = "free_y") +
+  facet_wrap(~ Variable, scales = "free_y",
+             labeller = labeller(Variable = function(x) sub("^Avg", "", x))
+             ) +
   scale_fill_manual(values = c(
     "SSP1-2.6"     = "#009E73",
     "SSP2-4.5"       = "#F0E442",
     "SSP5-8.5"      = "#D55E00"
   )) +
-  labs(title = "Normalized Outcomes for No Intervention Setting",
+  labs(title = "Outcomes under Baseline Setting (no forecasts, no supplemental food, 10% conservation) Per Climate Scenario",
        x = "Scenario",
        y = "Normalized Outcome (SSP2-4.5 median = 1)") +
   theme(legend.position = "none")
@@ -456,7 +381,7 @@ ggplot(df_long, aes(
   labs(
     x = "Proportion Conservation",
     y = "Value",
-    title = "Effect of Conservation Interventions on Outcomes under Different Climate Scenarios"
+    title = "Effects of Conservation Interventions under Different Climate Scenarios"
   ) +
   scale_color_manual(
     name   = "Forecasts × Fodder",
@@ -515,7 +440,7 @@ ggplot(df_long, aes(
   labs(
     x = "Proportion Conservation",
     y = "Value",
-    title = "Effect of Conservation Interventions on Outcomes under Different Climate Scenarios"
+    title = "Effects of Conservation Interventions under Different Climate Scenarios"
   ) +
   scale_color_manual(
     name   = "Forecasts × Fodder",
@@ -575,7 +500,6 @@ plot_df <- df_long %>%
   left_join(baseline_df, by = c("Scenario", "Variable")) %>%
   mutate(
     Value = RawValue / Baseline,
-    # optional pretty label for the facet/legend title if you ever show it
     Variable = factor(Variable, levels = "PropCons", labels = "Proportion Conservation"),
     Forecasts2 = dplyr::recode(Forecasts, Conservation = "Conservation", .default = Forecasts),
     Forecasts2 = factor(Forecasts2, levels = c("No_one", "Conservation")),
@@ -590,7 +514,7 @@ plot_df2 <- plot_df %>%
 Exp3_plot <- ggplot(plot_df2, aes(x = Forecasts2, y = Value, fill = Combo)) +
   geom_boxplot() +
   geom_hline(yintercept = 1, linetype = "dashed", color = "gray30") +
-  facet_wrap(~ Scenario, nrow = 1) +   # one row of scenarios
+  facet_wrap(~ Scenario, nrow = 1) + 
   scale_fill_manual(
     name   = "Forecast × Fodder",
     breaks = c("Conservation.TRUE", "Conservation.FALSE",
@@ -607,7 +531,7 @@ Exp3_plot <- ggplot(plot_df2, aes(x = Forecasts2, y = Value, fill = Combo)) +
     )
   ) +
   labs(
-    title = "Normalized Conservation Uptake with Different Conservation Interventions under Climate Scenarios",
+    title = "Conservation Uptake Under Varying Conservation Interventions and Climate Scenarios",
     x = "Forecast",
     y = "Normalized Conservation Uptake\n(median of no intervention (no fodder, no forecast) = 1)"
   ) +
