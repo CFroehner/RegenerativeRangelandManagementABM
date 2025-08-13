@@ -258,7 +258,11 @@ ggsave(
 
 # Save combined dataframe of all outcome datasets post burn in phase
 df_full_last30 <- df_full %>%
-  filter(Time > max(Time) - 30) %>%
+  ungroup() %>%
+  filter(Time > max(Time) - 30)
+  
+  df_full %>%
+  dplyr::filter(Time > max(Time) - 30) %>%
   select(-c(TotalCows, TotalGrass, Time, Rep))
 
 
@@ -410,7 +414,7 @@ ggplot(df_long, aes(
   
   stat_summary(fun = mean, geom = "point", size = 1.2, na.rm = TRUE) +
   
-  # error bars at observed x: mean ± 2 SD
+  # error bars at observed x: mean ± 1 SD
   # stat_summary(
   #   fun.data = mean_sdl, fun.args = list(mult = 1),
   #   geom = "errorbar", width = 0.02, linewidth = 0.6, lineend = "round",
@@ -557,7 +561,7 @@ df_long <- df_Exp3 %>%
     values_to = "RawValue"
   )
 
-# normalize by no intervention (no fodder, no forecast) per scenario and main variable
+# normalize prop cons by no intervention (no fodder, no forecast) per scenario
 baseline_df <- df_long %>%
   filter(Supplemental_fodder == FALSE, Forecasts_group == "No_one") %>%
   group_by(Scenario, Variable) %>%
@@ -566,57 +570,62 @@ baseline_df <- df_long %>%
     .groups = "drop"
   )
 
-plot_df <- df_Exp3 %>%
-  dplyr::select(Scenario,Forecasts,Supplemental_fodder,all_of(outcome_vars)) %>%
-  pivot_longer(cols = all_of(outcome_vars),names_to = "Variable",values_to = "Value") %>%
-  left_join(baseline_df, by = c("Supplemental_fodder", "Variable")) %>%
-  dplyr::mutate(
-    Value = RawValue / median_baseline,
-    Variable = factor(
-      Variable,
-      levels = main_vars,
-      labels = c(
-        "AvgMoney_mean" = "Money",
-        "AvgCows_mean" = "Cows",
-        "Gini_mean" = "Gini",
-        "AvgGrass_mean" = "Grass",
-        "Starting_Prop_Conservation" = "Start_Prop_Conservation"
-      )
-    ),
-    Supplemental_fodder = ifelse(Supplemental_fodder, "Fodder = TRUE", "Fodder = FALSE")
+plot_df <- df_long %>%
+  filter(Variable == "PropCons") %>%
+  left_join(baseline_df, by = c("Scenario", "Variable")) %>%
+  mutate(
+    Value = RawValue / Baseline,
+    # optional pretty label for the facet/legend title if you ever show it
+    Variable = factor(Variable, levels = "PropCons", labels = "Proportion Conservation"),
+    Forecasts2 = dplyr::recode(Forecasts, Conservation = "Conservation", .default = Forecasts),
+    Forecasts2 = factor(Forecasts2, levels = c("No_one", "Conservation")),
+    FodderFacet = ifelse(Supplemental_fodder, "Fodder = TRUE", "Fodder = FALSE")
   )
 
-Programm_Effect_ssp245 <- ggplot(plot_df, aes(x = Forecasts, y = Value, fill = Forecasts)) +
-  geom_boxplot() +
-  geom_hline(yintercept = 1, linetype = "dashed", color = "gray30") +
-  facet_wrap(~ Supplemental_fodder + Variable, scales = "free_y", ncol = length(main_vars)) +
-  scale_fill_brewer(palette = "Set2") +
-  labs(title = "Impact of programmatic decisions on outcomes",
-       x = "Forecast",
-       y = "Normalized Value (median of no forecasts = 1)") +
-  theme(legend.position = "none")
+plot_df2 <- plot_df %>%
+  mutate(
+    Combo = interaction(Forecasts2, Supplemental_fodder, sep = ".", drop = TRUE)
+  )
 
-# facetted by fodder and variable
-Programm_Effect_ssp245 <- ggplot(plot_df, aes(x = Forecasts, y = Value_norm, fill = Forecasts)) +
+Exp3_plot <- ggplot(plot_df2, aes(x = Forecasts2, y = Value, fill = Combo)) +
   geom_boxplot() +
   geom_hline(yintercept = 1, linetype = "dashed", color = "gray30") +
-  facet_grid(
-    Scenario ~ Supplemental_fodder + Variable,
-    scales = "free_y"
+  facet_wrap(~ Scenario, nrow = 1) +   # one row of scenarios
+  scale_fill_manual(
+    name   = "Forecast × Fodder",
+    breaks = c("Conservation.TRUE", "Conservation.FALSE",
+               "No_one.TRUE",       "No_one.FALSE"),
+    labels = c("Conservation + fodder",
+               "Conservation + no fodder",
+               "No one + fodder",
+               "No one + no fodder"),
+    values = c(
+      "Conservation.TRUE"  = "#1b9e77",
+      "Conservation.FALSE" = "#d95f02",
+      "No_one.TRUE"        = "#7570b3",
+      "No_one.FALSE"       = "#e7298a"
+    )
   ) +
-  # scale_fill_brewer(palette = "Set2") +
   labs(
-    title = "Impact of programmatic decisions on outcomes (SSP2-4.5)",
+    title = "Normalized Conservation Uptake under Different Settings",
     x = "Forecast",
-    y = "Normalized Value (median of no forecasts = 1)"
+    y = "Normalized Conservation Uptake\n(median of no-intervention = 1)"
   ) +
-  theme(legend.position = "none")
+  # theme_bw() +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_text(face = "bold")
+  ) +
+  theme(axis.title.x = element_blank(),
+          axis.text.x  = element_blank(),
+          axis.ticks.x = element_blank())
+  
 
-Programm_Effect_ssp245
+Exp3_plot
 
 ggsave(
-  filename = paste0("Manuscript_Vis/Programm_Effect_ssp245.png"),
-  plot = Programm_Effect_ssp245,
+  filename = paste0("Manuscript_Vis/Exp3_plot.png"),
+  plot = Exp3_plot,
   width = 10, height = 8, dpi = 300
 )
 
