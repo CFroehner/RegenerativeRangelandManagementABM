@@ -3,6 +3,7 @@ library(ggplot2)
 library(tidyverse)
 library(cowplot)
 library(ggh4x)
+library(ggthemes)
 
 if (!dir.exists("Manuscript_Vis")) {
   dir.create("Manuscript_Vis")
@@ -245,39 +246,43 @@ Exp1_boxplot <- ggplot(plot_df, aes(x = Scenario, y = Value, fill = Scenario)) +
     "SSP2-4.5"       = "#F0E442",
     "SSP5-8.5"      = "#D55E00"
   )) +
-  labs(title = "Outcomes under Baseline Setting (no forecasts, no supplemental food, 10% conservation) Per Climate Scenario",
+  labs(
+    # title = "Outcomes under Baseline Setting (no forecasts, no supplemental food, 10% conservation) Per Climate Scenario",
        x = "Scenario",
        y = "Normalized Outcome (SSP2-4.5 median = 1)") +
-  theme(legend.position = "none")
+  ggthemes::theme_clean()+
+  theme(legend.position = "none", strip.text = element_text(size =14,face="bold"),
+        axis.text=element_text(size=14),axis.title=element_text(size=16))
 
-print(Exp1_boxplot)
+
+Exp1_boxplot
 
 ggsave(
-  filename = paste0("Manuscript_Vis/Exp1_boxplot_", fname, ".png"),
+  filename = paste0("Manuscript_Vis/Exp1_boxplot.png"),
   plot = Exp1_boxplot,
   width = 10, height = 8, dpi = 300
 )
 
 # Coloured violin plot
-Exp1_violin <- ggplot(plot_df, aes(x = Scenario, y = Value, fill = Scenario)) +
-  geom_violin() +
-  geom_hline(yintercept = 1, linetype = "dashed", color = "black") +
-  facet_wrap(~ Variable, scales = "free_y") +
-  labs(title = "Normalized Outcomes for No Intervention Setting",
-       x = "Scenario",
-       y = "Normalized Outcome Value (SSP2-4.5 median = 1)")+
-  scale_fill_manual(values = c(
-    "SSP1-2.6"     = "#009E73",
-    "SSP2-4.5"       = "#F0E442",
-    "SSP5-8.5"      = "#D55E00"
-  )) + theme(legend.position = "none")
-
-print(Exp1_violin)
-
-ggsave(
-  filename = paste0("Manuscript_Vis/Exp1_violin_", fname, ".png"),
-  plot = Exp1_violin,
-  width = 10, height = 8, dpi = 300)
+# Exp1_violin <- ggplot(plot_df, aes(x = Scenario, y = Value, fill = Scenario)) +
+#   geom_violin() +
+#   geom_hline(yintercept = 1, linetype = "dashed", color = "black") +
+#   facet_wrap(~ Variable, scales = "free_y") +
+#   labs(title = "Normalized Outcomes for No Intervention Setting",
+#        x = "Scenario",
+#        y = "Normalized Outcome Value (SSP2-4.5 median = 1)")+
+#   scale_fill_manual(values = c(
+#     "SSP1-2.6"     = "#009E73",
+#     "SSP2-4.5"       = "#F0E442",
+#     "SSP5-8.5"      = "#D55E00"
+#   )) + theme(legend.position = "none")
+# 
+# print(Exp1_violin)
+# 
+# ggsave(
+#   filename = paste0("Manuscript_Vis/Exp1_violin.png"),
+#   plot = Exp1_violin,
+#   width = 10, height = 8, dpi = 300)
 
 
 # Exp 2 -------------------------------------------------------------------
@@ -309,6 +314,7 @@ df_long <- df_Exp2 %>%
 
 # normalize by no intervention (no fodder, no forecast) per scenario and main variable
 baseline_df <- df_long %>%
+  dplyr::filter(Scenario == "SSP2-4.5") %>%
   filter(Supplemental_fodder == FALSE, Forecasts_group == "No_one") %>%
   group_by(Scenario, Variable) %>%
   summarise(
@@ -316,103 +322,135 @@ baseline_df <- df_long %>%
     .groups = "drop"
   )
 
+baseline_df <- df_long %>%
+  filter(Supplemental_fodder == FALSE, Forecasts_group == "No_one") %>%
+  group_by(Variable) %>%
+  summarise(
+    Baseline = median(RawValue, na.rm = TRUE), # normalizing by median
+    .groups = "drop"
+  )
+
 df_long <- df_long %>%
-  left_join(baseline_df, by = c("Scenario", "Variable")) %>%
+  left_join(baseline_df, by = c("Variable")) %>%
   mutate(Value = RawValue / Baseline) %>%
   filter(is.finite(Value))
 
 df_long
 
 ## Option 1 using LOESS------------
-ggplot(df_long, aes(
+# Exp2_Loess <- ggplot(df_long, aes(
+#   x = Starting_Prop_Conservation, y = Value,
+#   color = interaction(Forecasts_group, Supplemental_fodder, sep = ".", drop = TRUE)
+# )) +
+#   geom_hline(yintercept = 1, linetype = "dotted", linewidth = 0.3, color = "grey40") +
+#   
+#   # # error bars at observed x: mean ± 2 SD
+#   # stat_summary(
+#   #   fun.data = mean_sdl, fun.args = list(mult = 2),
+#   #   geom = "errorbar", width = 0.02, linewidth = 0.6, lineend = "round",
+#   #   na.rm = TRUE
+#   # ) +
+#   
+#   # error bars at observed x: mean ± 1 SD
+#   stat_summary(
+#     fun.data = mean_sdl, fun.args = list(mult = 1),
+#     geom = "errorbar", width = 0.02, linewidth = 0.6, lineend = "round",
+#     na.rm = TRUE
+#   ) +
+#   
+#   stat_summary(fun = mean, geom = "point", size = 1.2, na.rm = TRUE) +
+#   
+#   # error bars at observed x: mean ± 1 SD
+#   # stat_summary(
+#   #   fun.data = mean_sdl, fun.args = list(mult = 1),
+#   #   geom = "errorbar", width = 0.02, linewidth = 0.6, lineend = "round",
+#   #   na.rm = TRUE
+#   # ) +
+#   
+#   # LOESS on the per-x group means (weighted by n) — inherits the combined color mapping
+#   geom_smooth(
+#     data = df_long %>%
+#       group_by(
+#         Scenario, Variable, Starting_Prop_Conservation,
+#         Forecasts_group, Supplemental_fodder
+#       ) %>%
+#       summarise(mean = mean(Value, na.rm = TRUE),
+#                 n    = dplyr::n(), .groups = "drop"),
+#     aes(y = mean, weight = n),
+#     method = "loess", se = TRUE, linewidth = 0.9, span = 0.75
+#   ) +
+#   
+#   ggh4x::facet_grid2(
+#     rows = vars(Scenario),
+#     cols = vars(Variable),
+#     scales = "free_y",
+#     independent = "y",
+#     labeller = labeller(
+#       Scenario = label_value,
+#       Variable = function(x) sub("^Avg", "", x)
+#     )
+#   ) +
+#   theme(
+#     strip.background = element_rect(fill = "grey90"),
+#     strip.text = element_text(face = "bold"),
+#     strip.placement = "outside",
+#     panel.grid.minor = element_blank(),
+#     legend.position = "bottom",
+#     panel.spacing.x = unit(1.4, "lines"),
+#     axis.text.x = element_text(angle = 45, hjust = 1)
+#   ) +
+#   labs(
+#     x = "Proportion Conservation",
+#     y = "Value",
+#     title = "Effects of Conservation Interventions under Different Climate Scenarios"
+#   ) +
+#   scale_color_manual(
+#     name   = "Forecasts × Fodder",
+#     breaks = c("Conservation.TRUE", "Conservation.FALSE",
+#                "No_one.TRUE",      "No_one.FALSE"),
+#     labels = c("Conservation + fodder",
+#                "Conservation + no fodder",
+#                "No one + fodder",
+#                "No one + no fodder"),
+#     values = c(
+#       "Conservation.TRUE"  = "#1b9e77",
+#       "Conservation.FALSE" = "#d95f02",
+#       "No_one.TRUE"        = "#7570b3",
+#       "No_one.FALSE"       = "#e7298a"
+#     )
+#   ) +
+#   guides(color = guide_legend(order = 1))
+# 
+# Exp2_Loess
+# 
+# ggsave(
+#   filename = "Manuscript_Vis/Exp2_Loess.png",
+#   plot = Exp2_Loess,
+#   width = 10, height = 8, dpi = 300
+# )
+
+## Option 2 with Linear Interpolation-------
+Exp2_LinInt <- ggplot(df_long, aes(
   x = Starting_Prop_Conservation, y = Value,
   color = interaction(Forecasts_group, Supplemental_fodder, sep = ".", drop = TRUE)
 )) +
-  geom_hline(yintercept = 1, linetype = "dotted", linewidth = 0.3, color = "grey40") +
+  geom_hline(yintercept = 1, linetype = "dashed", linewidth = 1, color = "#525252") +
   
-  # error bars at observed x: mean ± 2 SD
-  stat_summary(
-    fun.data = mean_sdl, fun.args = list(mult = 2),
-    geom = "errorbar", width = 0.02, linewidth = 0.6, lineend = "round",
-    na.rm = TRUE
-  ) +
-  
-  stat_summary(fun = mean, geom = "point", size = 1.2, na.rm = TRUE) +
-  
-  # error bars at observed x: mean ± 1 SD
+  # # error bars at observed x: mean ± 2 SD
   # stat_summary(
-  #   fun.data = mean_sdl, fun.args = list(mult = 1),
+  #   fun.data = mean_sdl, fun.args = list(mult = 2),
   #   geom = "errorbar", width = 0.02, linewidth = 0.6, lineend = "round",
   #   na.rm = TRUE
   # ) +
   
-  # LOESS on the per-x group means (weighted by n) — inherits the combined color mapping
-  geom_smooth(
-    data = df_long %>%
-      group_by(
-        Scenario, Variable, Starting_Prop_Conservation,
-        Forecasts_group, Supplemental_fodder
-      ) %>%
-      summarise(mean = mean(Value, na.rm = TRUE),
-                n    = dplyr::n(), .groups = "drop"),
-    aes(y = mean, weight = n),
-    method = "loess", se = TRUE, linewidth = 0.9, span = 0.75
-  ) +
-  
-  ggh4x::facet_grid2(
-    rows = vars(Scenario),
-    cols = vars(Variable),
-    scales = "free_y",
-    independent = "y",
-    labeller = labeller(
-      Scenario = label_value,
-      Variable = function(x) sub("^Avg", "", x)
-    )
-  ) +
-  theme(
-    strip.background = element_rect(fill = "grey90"),
-    strip.text = element_text(face = "bold"),
-    strip.placement = "outside",
-    panel.grid.minor = element_blank(),
-    legend.position = "bottom",
-    panel.spacing.x = unit(1.4, "lines"),
-    axis.text.x = element_text(angle = 45, hjust = 1)
-  ) +
-  labs(
-    x = "Proportion Conservation",
-    y = "Value",
-    title = "Effects of Conservation Interventions under Different Climate Scenarios"
-  ) +
-  scale_color_manual(
-    name   = "Forecasts × Fodder",
-    breaks = c("Conservation.TRUE", "Conservation.FALSE",
-               "No_one.TRUE",      "No_one.FALSE"),
-    labels = c("Conservation + fodder",
-               "Conservation + no fodder",
-               "No one + fodder",
-               "No one + no fodder"),
-    values = c(
-      "Conservation.TRUE"  = "#1b9e77",
-      "Conservation.FALSE" = "#d95f02",
-      "No_one.TRUE"        = "#7570b3",
-      "No_one.FALSE"       = "#e7298a"
-    )
-  ) +
-  guides(color = guide_legend(order = 1))
-
-## Option 2 with Linear Interpolation-------
-ggplot(df_long, aes(
-  x = Starting_Prop_Conservation, y = Value,
-  color = interaction(Forecasts_group, Supplemental_fodder, sep = ".", drop = TRUE)
-)) +
-  geom_hline(yintercept = 1, linetype = "dashed", linewidth = 0.3, color = "grey40") +
-  
-  # error bars at observed x: mean ± 2 SD
+  # error bars at observed x: mean ± 1 SD
   stat_summary(
-    fun.data = mean_sdl, fun.args = list(mult = 2),
+    fun.data = mean_sdl, fun.args = list(mult = 1),
     geom = "errorbar", width = 0.02, linewidth = 0.6, lineend = "round",
     na.rm = TRUE
   ) +
+  
+  
   # mean points
   stat_summary(fun = mean, geom = "point", size = 1.2, na.rm = TRUE) +
   # piecewise-linear interpolation between means
@@ -438,18 +476,18 @@ ggplot(df_long, aes(
     axis.text.x = element_text(angle = 45, hjust = 1)
   ) +
   labs(
-    x = "Proportion Conservation",
-    y = "Value",
-    title = "Effects of Conservation Interventions under Different Climate Scenarios"
+    x = "Proportion of communities in conservation",
+    y = "Normalized outcome",
+    # title = "Effects of Conservation Interventions under Different Climate Scenarios"
   ) +
   scale_color_manual(
-    name   = "Forecasts × Fodder",
+    name   = "Conservation program add-on",
     breaks = c("Conservation.TRUE", "Conservation.FALSE",
                "No_one.TRUE",      "No_one.FALSE"),
-    labels = c("Conservation + fodder",
-               "Conservation + no fodder",
-               "No one + fodder",
-               "No one + no fodder"),
+    labels = c("Forecast + fodder",
+               "Forecast only",
+               "Fodder only",
+               "Neither"),
     values = c(
       "Conservation.TRUE"  = "#1b9e77",
       "Conservation.FALSE" = "#d95f02",
@@ -457,7 +495,19 @@ ggplot(df_long, aes(
       "No_one.FALSE"       = "#e7298a"
     )
   ) +
-  guides(color = guide_legend(order = 1))
+  #scale_y_continuous(n.breaks=4)+
+  guides(color = guide_legend(order = 1))  +
+  ggthemes::theme_clean()+
+  theme(legend.position = "bottom", strip.text = element_text(size =14,face="bold"), panel.spacing = unit(2, "lines"),
+        axis.text=element_text(size=14),axis.title=element_text(size=16))
+
+Exp2_LinInt
+
+ggsave(
+  filename = paste0("Manuscript_Vis/Exp2_LinInt.png"),
+  plot = Exp2_LinInt,
+  width = 10, height = 8, dpi = 300
+)
 
 # Exp 3 -------------------------------------------------------------------
 
@@ -468,6 +518,7 @@ df_Exp3 <- df_Exp3 %>%
     Forecasts %in% c("No_one", "Conservation"),
     Set_Adoption == FALSE,
     Supplemental_fodder %in% c(TRUE, FALSE),
+    # Starting_Prop_Conservation == 0.1,
     Starting_Prop_Conservation == 0.25,
     ForecastError==0
   )
@@ -516,13 +567,13 @@ Exp3_plot <- ggplot(plot_df2, aes(x = Forecasts2, y = Value, fill = Combo)) +
   geom_hline(yintercept = 1, linetype = "dashed", color = "gray30") +
   facet_wrap(~ Scenario, nrow = 1) + 
   scale_fill_manual(
-    name   = "Forecast × Fodder",
+    name   = "Conservation program add-on",
     breaks = c("Conservation.TRUE", "Conservation.FALSE",
                "No_one.TRUE",       "No_one.FALSE"),
-    labels = c("Conservation + fodder",
-               "Conservation + no fodder",
-               "No one + fodder",
-               "No one + no fodder"),
+    labels = c("Forecast + fodder",
+               "Forecast only",
+               "Fodder only",
+               "Neither"),
     values = c(
       "Conservation.TRUE"  = "#1b9e77",
       "Conservation.FALSE" = "#d95f02",
@@ -531,9 +582,9 @@ Exp3_plot <- ggplot(plot_df2, aes(x = Forecasts2, y = Value, fill = Combo)) +
     )
   ) +
   labs(
-    title = "Conservation Uptake Under Varying Conservation Interventions and Climate Scenarios",
+    #title = "Conservation Uptake Under Varying Conservation Interventions and Climate Scenarios",
     x = "Forecast",
-    y = "Normalized Conservation Uptake\n(median of no intervention (no fodder, no forecast) = 1)"
+    y = "Normalized conservation engagement"
   ) +
   # theme_bw() +
   theme(
@@ -542,9 +593,11 @@ Exp3_plot <- ggplot(plot_df2, aes(x = Forecasts2, y = Value, fill = Combo)) +
   ) +
   theme(axis.title.x = element_blank(),
           axis.text.x  = element_blank(),
-          axis.ticks.x = element_blank())
+          axis.ticks.x = element_blank())+
+  ggthemes::theme_clean()+
+  theme(legend.position = "bottom", strip.text = element_text(size =14,face="bold"), panel.spacing = unit(2, "lines"),axis.title.x = element_blank(),
+        axis.text=element_text(size=14),axis.title=element_text(size=16),axis.text.x = element_blank(),axis.ticks.x = element_blank())
   
-
 Exp3_plot
 
 ggsave(
