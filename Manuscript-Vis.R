@@ -607,9 +607,9 @@ Exp3_plot <- ggplot(plot_df2, aes(x = Forecasts2, y = Value, fill = Combo)) +
     )
   ) +
   labs(
-    title = "Normalized Conservation Uptake under Different Settings",
+    title = "Normalized Conservation Uptake with Different Conservation Interventions under Climate Scenarios",
     x = "Forecast",
-    y = "Normalized Conservation Uptake\n(median of no-intervention = 1)"
+    y = "Normalized Conservation Uptake\n(median of no intervention (no fodder, no forecast) = 1)"
   ) +
   # theme_bw() +
   theme(
@@ -628,5 +628,9 @@ ggsave(
   plot = Exp3_plot,
   width = 10, height = 8, dpi = 300
 )
+
+
+# Exp 4 -------------------------------------------------------------------
+
 
 
