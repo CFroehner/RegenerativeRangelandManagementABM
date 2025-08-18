@@ -101,7 +101,7 @@ SummaryStats <- AllSimResultsDF %>%
   )
 
 ts_long <- SummaryStats %>%
-  select(Scenario, Time,
+  dplyr::select(Scenario, Time,
          AvgMoney_mean, AvgMoney_sd,
          AvgCows_mean,  AvgCows_sd,
          AvgGrass_mean, AvgGrass_sd,
@@ -181,7 +181,7 @@ ggsave(
 df_full_last30 <- df_full %>%
   ungroup() %>%
   filter(Time > max(Time) - 30) %>%
-  select(-c(
+  dplyr::select(-c(
     TotalCows,
     TotalGrass,
     Time, 
@@ -246,7 +246,7 @@ Exp1_boxplot <- ggplot(plot_df, aes(x = Scenario, y = Value, fill = Scenario)) +
   )) +
   labs(
     # title = "Outcomes under Baseline Setting (no forecasts, no supplemental food, 10% conservation) Per Climate Scenario",
-       x = "Scenario",
+       x = "Climate Scenario",
        y = "Normalized Outcome (SSP2-4.5 median = 1)") +
   ggthemes::theme_clean()+
   theme(legend.position = "none", strip.text = element_text(size =14,face="bold"),
@@ -264,8 +264,8 @@ ggsave(
 # Exp 2 -------------------------------------------------------------------
 # Effects of conservation interventions on outcomes (conservation interventions 
 # in different extents)
-# @COSIMA/MATT: Decide on type of interpolation, and error bars (max, min; 2SD; 1 SD etc.)
-# @COSIMA: consider normalizing by values per column?? Make y axis consistent wihtin columns
+
+# 2.1 ---------------------------------------------------------------------
 
 df_Exp2 <- read_csv("CombinedData_PostBurnIN.csv") %>%
   dplyr::filter(
@@ -400,6 +400,93 @@ ggsave(
   filename = paste0("Manuscript_Vis/Exp2_LinInt.png"),
   plot = Exp2_LinInt,
   width = 10, height = 8, dpi = 300
+)
+
+
+# 2.2---------------------------------------------
+# Visualization of outcome Trade-Offs
+
+df_Exp2b <- read_csv("CombinedData_PostBurnIN.csv") %>%
+  dplyr::filter(
+    Forecasts %in% c("No_one", "Conservation"),
+    Set_Adoption == TRUE,
+    Supplemental_fodder %in% c(TRUE, FALSE),
+    Starting_Prop_Conservation %in% c(0.5),
+    ForecastError == 0,
+    Scenario == "SSP2-4.5"
+  )
+
+outcome_vars <- c("AvgMoney", "AvgCows", "AvgGrass", "Gini")
+axis_labels <- c(
+  AvgMoney = "Economic wellbeing",
+  AvgCows  = "Livestock",
+  AvgGrass = "Vegetation",
+  Gini     = "Inequality"
+)
+
+df_heat_in <- df_Exp2b %>%
+  mutate(
+    Config = case_when(
+      Forecasts == "Conservation" & Supplemental_fodder ~ "Forecast + fodder",
+      Forecasts == "Conservation" & !Supplemental_fodder ~ "Forecast only",
+      Forecasts == "No_one"       & Supplemental_fodder  ~ "Fodder only",
+      Forecasts == "No_one"       & !Supplemental_fodder ~ "Neither"
+    ),
+    Config = factor(Config, levels = c(
+      "Forecast + fodder", "Forecast only", "Fodder only", "Neither"
+    ))
+  )
+
+lvl <- unname(axis_labels[outcome_vars])
+
+cor_long <- df_heat_in %>% group_by(Config) %>%
+  group_modify(~{
+    m <- cor(.x[, outcome_vars],
+             use = "pairwise.complete.obs",
+             method = "pearson")
+    as_tibble(m, rownames = "VarY") %>%
+      pivot_longer(-VarY, names_to = "VarX", values_to = "r")
+  }) %>%
+  ungroup() %>%
+  mutate(
+    VarX = factor(VarX, levels = outcome_vars, labels = lvl),
+    VarY = factor(VarY, levels = outcome_vars, labels = lvl),
+    iX = match(as.character(VarX), lvl),
+    iY = match(as.character(VarY), lvl)
+  ) %>%
+  filter(iY <= iX) # to only show lower triangle
+
+Tradeoff_Heatmaps <- ggplot(cor_long, aes(VarX, VarY, fill = r)) +
+  geom_tile(color = "grey90", linewidth = 0.4) +
+  geom_text(aes(label = sprintf("%.2f", r)), size = 3) +
+  coord_equal() +
+  facet_wrap(~ Config, nrow = 1) +
+  scale_fill_gradient2(
+    name   = "Pearson Correlation",
+    limits = c(-1, 1),
+    breaks = seq(-1, 1, by = 0.5),
+    low = "#d73027", mid = "white", high = "#1a9850"
+  ) +
+  labs(
+    x = NULL, y = NULL
+    # ,
+    # title = "Outcome trade-offs under 50% community conservation in the SSP2-4.5 climate scenario"
+  ) +
+  ggthemes::theme_clean() +
+  theme(
+    legend.position = "bottom",
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text = element_text(face = "bold", size = 12),
+    panel.spacing = unit(1, "lines"),
+    legend.margin = margin(10, 10, 10, 10) 
+  ) 
+
+Tradeoff_Heatmaps
+
+ggsave(
+  filename = paste0("Manuscript_Vis/tradeoff_heatmaps_SSP245_50ADOP.png"),
+  plot = Tradeoff_Heatmaps,
+  width = 10, height = 5, dpi = 300
 )
 
 # Exp 3 -------------------------------------------------------------------
