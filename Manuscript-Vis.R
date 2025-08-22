@@ -262,10 +262,10 @@ ggsave(
 )
 
 # Exp 2 -------------------------------------------------------------------
+
+## Normalized by SSP2-4.5 --------------------------------------------------
 # Effects of conservation interventions on outcomes (conservation interventions 
 # in different extents)
-
-# 2.1 ---------------------------------------------------------------------
 
 df_Exp2 <- read_csv("CombinedData_PostBurnIN.csv") %>%
   dplyr::filter(
@@ -289,14 +289,24 @@ df_long <- df_Exp2 %>%
     values_to = "RawValue"
   )
 
-# normalize by no intervention (no fodder, no forecast) per main variable
+# Normalize by median of no intervention (no fodder, no forecast) within Scenario SSP2-4.5, 
+# by variable
 baseline_df <- df_long %>%
-  filter(Supplemental_fodder == FALSE, Forecasts_group == "No_one") %>%
-  group_by(Variable) %>%
-  summarise(
-    Baseline = median(RawValue, na.rm = TRUE), # normalizing by median
+  dplyr::filter(Scenario == "SSP2-4.5") %>%
+  dplyr::group_by(Variable) %>%
+  dplyr::summarise(
+    Baseline = median(RawValue, na.rm = TRUE),
     .groups = "drop"
   )
+
+# by median of no intervention across scenarios
+# baseline_df <- df_long %>%
+#   filter(Supplemental_fodder == FALSE, Forecasts_group == "No_one") %>%
+#   group_by(Variable) %>%
+#   summarise(
+#     Baseline = median(RawValue, na.rm = TRUE), # normalizing by median
+#     .groups = "drop"
+#   )
 
 df_long <- df_long %>%
   left_join(baseline_df, by = c("Variable")) %>%
@@ -380,30 +390,29 @@ Exp2_LinInt <- ggplot(df_long, aes(
       "No_one.FALSE"       = "#e7298a"
     )
   ) +
-  #scale_y_continuous(n.breaks=4)+
   guides(color = guide_legend(order = 1))  +
   ggthemes::theme_clean()+
   theme(legend.position = "bottom", strip.text = element_text(size =14,face="bold"), panel.spacing = unit(2, "lines"),
         axis.text=element_text(size=14),axis.title=element_text(size=16)) +
   ggh4x::facetted_pos_scales(
     y = list(
-      Variable == "AvgMoney" ~ scale_y_continuous(limits = c(-0.1, 3.5), n.breaks = 4),
-      Variable == "AvgCows"  ~ scale_y_continuous(limits = c(-0.1, 2.6), n.breaks = 4),
+      Variable == "AvgMoney" ~ scale_y_continuous(limits = c(-0.7, 2.1), n.breaks = 4),
+      Variable == "AvgCows"  ~ scale_y_continuous(limits = c(0, 2), n.breaks = 4),
       Variable == "AvgGrass" ~ scale_y_continuous(limits = c(0.2, 1.1), n.breaks = 4),
-      Variable == "Gini"     ~ scale_y_continuous(limits = c(0.1, 1.2), n.breaks = 4)
+      Variable == "Gini"     ~ scale_y_continuous(limits = c(0.15, 1.5), n.breaks = 4)
     )
   )
 
 Exp2_LinInt
 
 ggsave(
-  filename = paste0("Manuscript_Vis/Exp2_LinInt.png"),
+  filename = paste0("Manuscript_Vis/Exp2_LinInt_normed_SSP245_adapted.png"),
   plot = Exp2_LinInt,
   width = 10, height = 8, dpi = 300
 )
 
 
-# 2.2---------------------------------------------
+## Trade-Offs 50% SSP2-4.5---------------------------------------------
 # Visualization of outcome Trade-Offs
 
 df_Exp2b <- read_csv("CombinedData_PostBurnIN.csv") %>%
@@ -465,7 +474,12 @@ Tradeoff_Heatmaps <- ggplot(cor_long, aes(VarX, VarY, fill = r)) +
     name   = "Pearson Correlation",
     limits = c(-1, 1),
     breaks = seq(-1, 1, by = 0.5),
-    low = "#d73027", mid = "white", high = "#1a9850"
+    # low = "#d73027", mid = "white", high = "#1a9850"
+    # low = "#d73027", mid = "white", high = "#4575b4"
+    # high = "#762a83", mid = "white", low = "#d7191c"
+    low = "#E66100", mid = "white", high = "#5D3A9B"
+    # low = "#FFC20A", mid = "white", high = "#0C7BDC"
+    # high = "#1AFF1A", mid = "white", low = "#4B0092"
   ) +
   labs(
     x = NULL, y = NULL
@@ -484,7 +498,7 @@ Tradeoff_Heatmaps <- ggplot(cor_long, aes(VarX, VarY, fill = r)) +
 Tradeoff_Heatmaps
 
 ggsave(
-  filename = paste0("Manuscript_Vis/tradeoff_heatmaps_SSP245_50ADOP.png"),
+  filename = paste0("Manuscript_Vis/tradeoff_heatmaps_SSP245_50ADOP_colouradapt.png"),
   plot = Tradeoff_Heatmaps,
   width = 10, height = 5, dpi = 300
 )
@@ -525,18 +539,20 @@ df_long <- df_Exp3 %>%
     values_to = "RawValue"
   )
 
-# normalize prop cons by no intervention (no fodder, no forecast) per scenario
+# normalize prop cons by no intervention (no fodder, no forecast) in SSP2-4.5
 baseline_df <- df_long %>%
-  filter(Supplemental_fodder == FALSE, Forecasts_group == "No_one") %>%
+  filter(Supplemental_fodder == FALSE, Forecasts_group == "No_one", 
+         Scenario == "SSP2-4.5\n(middle-of-the-road)") %>%
   group_by(Scenario, Variable) %>%
   summarise(
     Baseline = median(RawValue, na.rm = TRUE), # normalizing by median
     .groups = "drop"
-  )
+  ) %>%
+  select(-Scenario)
 
 plot_df <- df_long %>%
   filter(Variable == "PropCons") %>%
-  left_join(baseline_df, by = c("Scenario", "Variable")) %>%
+  left_join(baseline_df, by = c("Variable")) %>%
   mutate(
     Value = RawValue / Baseline,
     Variable = factor(Variable, levels = "PropCons", labels = "Conservation\nengagement"),
@@ -583,16 +599,16 @@ Exp3_plot <- ggplot(plot_df2, aes(x = Combo, y = Value, fill = Combo)) +
     legend.title = element_text(face = "bold")
   ) +
   theme(axis.title.x = element_blank(),
-          axis.text.x  = element_blank(),
-          axis.ticks.x = element_blank())+
+        axis.text.x  = element_blank(),
+        axis.ticks.x = element_blank())+
   ggthemes::theme_clean()+
   theme(legend.position = "bottom", strip.text = element_text(size =14,face="bold"), panel.spacing = unit(2, "lines"),axis.title.x = element_blank(),
         axis.text=element_text(size=14),axis.title=element_text(size=16),axis.text.x = element_blank(),axis.ticks.x = element_blank())
-  
+
 Exp3_plot
 
 ggsave(
-  filename = paste0("Manuscript_Vis/Exp3_plot.png"),
+  filename = paste0("Manuscript_Vis/Exp3_boxplot.png"),
   plot = Exp3_plot,
   width = 10, height = 8, dpi = 300
 )
