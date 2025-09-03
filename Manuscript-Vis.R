@@ -613,10 +613,11 @@ ggsave(
   width = 10, height = 8, dpi = 300
 )
 
-# Exp 4 -------------------------------------------------------------------
+
+# Supplemental ------------------------------------------------------------
 
 # Line Plots different ForecAcc -------------------------------------------
-df_Exp4 <- read_csv("CombinedData_PostBurnIN.csv") %>%
+df_forecAcc <- read_csv("CombinedData_PostBurnIN.csv") %>%
   filter(
     Forecasts %in% c("No_one", "Conservation", "Everyone", "Rich", "Poor"),
     ForecastError %in% c(0, 10, 20, 30),
@@ -627,7 +628,7 @@ df_Exp4 <- read_csv("CombinedData_PostBurnIN.csv") %>%
 
 outcome_vars <- c("AvgMoney", "AvgCows", "AvgGrass", "Gini", "PropCons")
 
-df_long <- df_Exp4 %>%
+df_long <- df_forecAcc %>%
   mutate(
     Forecasts_group = factor(
       Forecasts,
@@ -660,7 +661,7 @@ plot_df <- df_long %>%
   filter(is.finite(Value))
 
 
-Exp4_plot <- ggplot(
+forecAcc_plot <- ggplot(
   plot_df,
   aes(x = ForecastError, y = Value, color = Forecasts_group, group = Forecasts_group)
 ) +
@@ -726,12 +727,12 @@ Exp4_plot <- ggplot(
     )
   )
 
-Exp4_plot
+forecAcc_plot
 
 
 # Boxplots ForecastAcc 0 --------------------------------------------------
 
-df_Exp4 <- read_csv("CombinedData_PostBurnIN.csv") %>%
+df_forecAcc <- read_csv("CombinedData_PostBurnIN.csv") %>%
     filter(
       Forecasts %in% c("No_one", "Conservation", "Everyone", "Rich", "Poor"),
       ForecastError %in% c(0, 10, 20, 30),
@@ -742,7 +743,7 @@ df_Exp4 <- read_csv("CombinedData_PostBurnIN.csv") %>%
   
 outcome_vars <- c("AvgMoney", "AvgCows", "AvgGrass", "Gini", "PropCons")
   
-df_long <- df_Exp4 %>%
+df_long <- df_forecAcc %>%
     mutate(
       Forecasts_group = factor(
         Forecasts,
@@ -801,7 +802,7 @@ y_scales <- map(
   )
 )
 
-Exp4_box <- ggplot(
+forecAcc_plot_box <- ggplot(
   plot_df0,
   aes(x = Forecasts_group, y = Value, fill = Forecasts_group)
 ) +
@@ -846,5 +847,7 @@ Exp4_box <- ggplot(
   ) +
   ggh4x::facetted_pos_scales(y = y_scales)
 
-Exp4_box
+forecAcc_plot_box
+
+
 
