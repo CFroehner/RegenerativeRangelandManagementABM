@@ -57,8 +57,8 @@ Download [`Ts_Data`](https://drive.google.com/file/d/1G6POSfm8SaYC4ZBgtwkPUq5TDh
 
 ## How to customize the agent-based model
 
-1. Modify the model in `RunModel.R`. Sections in the script correspond to manuscript modules.
-2. Play with settings (such as animal cost or capital gain rate) in the `RunModel.R` section `Model parameters`.
+1. Modify the model in `RunModel.R`. Sections in the script correspond to manuscript modules (e.g., T0 set-up/initialization of landscape, grazing, etc.).
+2. Play with settings (e.g., animal cost, capital gain rate, etc.) in the `RunModel.R` section `Model parameters`.
 3. Adjust plots in GeneratePlots.R (facets, normalization, themes).
 
 # Citation
