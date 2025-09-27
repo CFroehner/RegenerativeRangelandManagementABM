@@ -46,6 +46,7 @@ The repository includes a tiny toy run to reproduce the core pipeline and genera
   ```
 
 *Option B (use pregenerated data):*
+
 Download [`Ts_Data`](https://drive.google.com/file/d/1G6POSfm8SaYC4ZBgtwkPUq5TDhat1wRN/view?usp=sharing) and place the folder in the repo root next to the scripts.
 
 3. Analyze and plot:
