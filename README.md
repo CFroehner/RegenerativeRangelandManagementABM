@@ -17,7 +17,7 @@ packages ‹- c(
 "gstat", "spdep", "ggplot2", "tidyverse", "cowplot", "ggh4x", "ggthemes",
 "vroom", "glue", "fs", "purri", "tibble"
 )
-install. packages (setdiff(packages, rownames(installed.packages ())))
+install.packages (setdiff(packages, rownames(installed.packages ())))
 ```
 ## Toy example (quickstart)
 The repository includes a tiny toy run to reproduce the core pipeline quickly and generate example visualizations without the long ABM runtime.
