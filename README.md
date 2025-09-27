@@ -57,18 +57,9 @@ Download [`Ts_Data`](https://drive.google.com/file/d/1G6POSfm8SaYC4ZBgtwkPUq5TDh
 
 ## How to customize the agent-based model
 
-1. Clone this repository to your local machine:
-  ```bash
-  git clone https://github.com/matthewclark1223/RegenerativeRangelandManagementABM.git
-  cd RegenerativeRangelandManagementABM
-  ```
-
-2. Adapt agent-based model: For instance one could,
-    - adapt or extend mechanics of the model: subheadings in `RunModel.R` correspond to currently implemented and adaptable modules described in the manuscript;
-    - re-define experimental conditions and settings in `conditions <- readRDS("ExperimentConditions.rds")` and `RunModel.R` code lines XX-XX.
-    
-3. Potentially adapt experiments or visualizations in `GeneratePlots.R`
-
+1. Modify the model in `RunModel.R`. Sections in the script correspond to manuscript modules.
+2. Play with settings (such as animal cost or capital gain rate) in the `RunModel.R` section `Model parameters`.
+3. Adjust plots in GeneratePlots.R (facets, normalization, themes).
 
 # Citation
 
