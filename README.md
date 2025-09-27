@@ -20,7 +20,7 @@ packages ‹- c(
 install.packages (setdiff(packages, rownames(installed.packages ())))
 ```
 ## Toy example (quickstart)
-The repository includes a tiny toy run to reproduce the core pipeline quickly and generate example visualizations without the long ABM runtime.
+The repository includes a tiny toy run to reproduce the core pipeline and generate example visualizations without the long ABM runtime.
 
 **What it does**
 - Runs a minimal ABM configuration (fewer repetitions, conditions for experiment 1 only) and writes outputs to Ts_Data_toy/.
