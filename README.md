@@ -8,7 +8,7 @@ This repository contains the code for the agent-based model and experiments used
 - **GeneratePlots.R**: Code to reproduce visualizations for experiments 1-3 and supplementals from the manuscript. It expects ABM outputs in a Ts_Data-style folder (see below).
 - **ExperimentConditions.rds**, **ConditionsExp1.rds**: Predefined experimental settings for running the ABM, used in manuscript experiments 1 to 3 and supplemental material (forecast settings, provision of supplemental fodder, social learning settings, etc.). The file ``ConditionsExp1.rds`` includes the conditions for experiment 1 only to run the toy example.
 - **StylizedLandscape/**: Scripts and inputs for creating the stylized landscape.
-- **AncillaryScripts/**: Ancillary scripts and inputs used for deriving parameters and settings for the ABM.
+- **AncillaryScripts/**: Ancillary scripts and inputs used for deriving parameters and settings for the ABM. To run `PredictedRainfall.R`, download climate data from [here]([link to paper](https://cds.climate.copernicus.eu/datasets/projections-cmip6?tab=download)).
 
 ## Prerequisites
 - R ≥ 4.1
