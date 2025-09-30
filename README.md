@@ -25,7 +25,7 @@ install.packages (setdiff(packages, rownames(installed.packages ())))
 The repo includes a small toy run that reproduces the core pipeline without the full ABM runtime. If you keep the plot pane open, you’ll see the stylized landscape update as the run progresses.
 
 **What it does**
-- Runs a minimal ABM configuration (one repetition, conditions for experiment 1 only) and writes outputs to Ts_Data_toy/.
+- Runs a minimal ABM configuration (one repetition of 100 timesteps across 3 precipitation scenarios, using only the conditions from experiment 1) and writes the outputs to Ts_Data_toy/.
 - Generates ABM burn-in plot into Manuscript_Vis_toy/.
 
 ```
