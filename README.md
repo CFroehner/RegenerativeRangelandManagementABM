@@ -6,8 +6,9 @@ This repository contains the code for the agent-based model and experiments used
 - **RunModel.R**: Code for the agent-based model (ABM). Sources landscape files from `StylizedLandscape` and precipitation from `PrecipTimeseries.R` to create the initial landscape and generate precipitation scenarios. Runtime for one full setting across the three climate scenarios is ~45 minutes. It also supports a toy quickstart via environment variables.
 - **ToyRun.R**: Code for a toy run of ``RunModel.R``.
 - **GeneratePlots.R**: Code to reproduce visualizations for experiments 1-3 and supplementals from the manuscript. It expects ABM outputs in a Ts_Data-style folder (see below).
-- **StylizedLandscape/**: Scripts and incputs for creating the stylized landscape, including intermediate figures used by the ABM.
+- **StylizedLandscape/**: Scripts and inputs for creating the stylized landscape, including intermediate figures used by the ABM.
 - **ExperimentConditions.rds**: Predefined experimental settings for running the ABM, used in manuscript experiments 1 to 3 and supplemental material (forecast settings, provision of supplemental fodder, social learning settings, etc.).
+- **AncillaryScripts/**: Ancillary scripts and inputs used for deriving parameters and settings for the ABM.
 
 ## Prerequisites
 - R ≥ 4.1
@@ -21,11 +22,11 @@ packages ‹- c(
 install.packages (setdiff(packages, rownames(installed.packages ())))
 ```
 ## Toy example (quickstart)
-The repository includes a tiny toy run to reproduce the core pipeline and generate example visualizations without the long ABM runtime.
+The repo includes a small toy run that reproduces the core pipeline without the full ABM runtime. If you keep the plot pane open, you’ll see the stylized landscape update as the run progresses.
 
 **What it does**
-- Runs a minimal ABM configuration (fewer repetitions, conditions for experiment 1 only) and writes outputs to Ts_Data_toy/.
-- Generates ABM burn-in and experiment 1 plots into Manuscript_Vis_toy/.
+- Runs a minimal ABM configuration (one repetition, conditions for experiment 1 only) and writes outputs to Ts_Data_toy/.
+- Generates ABM burn-in plot into Manuscript_Vis_toy/.
 
 ```
   Rscript RunToy.R
