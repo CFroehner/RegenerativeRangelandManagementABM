@@ -3,15 +3,16 @@
 This repository contains the code for the agent-based model and experiments used in the study ["Eliminating climate change mitigation trade-offs in African rangelands,"](link to paper) which explores how pairing forecasts with conservation programming can reduce trade-offs among vegetation cover, livestock numbers, and wealth inequality, supporting effective adaptation to climate change at scale.
 
 ## Repository structure
-- **RunModel.R**: Code for the agent-based model (ABM). Sources landscape files from `StylizedLandscape` and precipitation from `PrecipTimeseries.R` to create the initial landscape and generate precipitation scenarios. Runtime for one full setting across the three climate scenarios is ~45 minutes. It also supports a toy quickstart via environment variables.
+- **RunModel.R**: Code for the agent-based model (ABM). Sources landscape files from `StylizedLandscape/` and precipitation from `PrecipTimeseries.R` to create the initial landscape and generate precipitation scenarios. Runtime for one full setting across the three climate scenarios is ~45 minutes. It also supports a toy quickstart via environment variables.
 - **ToyRun.R**: Code for a toy run of ``RunModel.R``.
 - **GeneratePlots.R**: Code to reproduce visualizations for experiments 1-3 and supplementals from the manuscript. It expects ABM outputs in a Ts_Data-style folder (see below).
 - **ExperimentConditions.rds**, **ConditionsExp1.rds**: Predefined experimental settings for running the ABM, used in manuscript experiments 1 to 3 and supplemental material (forecast settings, provision of supplemental fodder, social learning settings, etc.). The file ``ConditionsExp1.rds`` includes the conditions for experiment 1 only to run the toy example.
 - **StylizedLandscape/**: Scripts and inputs for creating the stylized landscape.
-- **AncillaryScripts/**: Ancillary scripts and inputs used for deriving parameters and settings for the ABM. To run `PredictedRainfall.R`, download [precipitation projection data] (https://cds.climate.copernicus.eu/datasets/projections-cmip6?tab=download).
+- **AncillaryScripts/**: Ancillary scripts and inputs used for deriving parameters and settings for the ABM. To run `PredictedRainfall.R`, download [precipitation projection data](https://cds.climate.copernicus.eu/datasets/projections-cmip6?tab=download).
 
 ## Prerequisites
 - R ≥ 4.1
+- Download the file [povmap-grdi-v1.tif](https://syncandshare.lrz.de/getlink/fiPw7h8k9QaACopENWok9m/) and place it inside the `StylizedLandscape/` folder.
 - Packages for ABM and visualizations:
 ```
 packages ‹- c(
@@ -21,14 +22,13 @@ packages ‹- c(
 )
 install.packages (setdiff(packages, rownames(installed.packages ())))
 ```
-- Download the `povmap-grdi-v1.tif` file [here](https://syncandshare.lrz.de/getlink/fiPw7h8k9QaACopENWok9m/) and add on the level of the ```StylizedLandscape/`` folder.
 
 ## Toy example (quickstart)
 The repo includes a small toy run that reproduces the core pipeline without the full ABM runtime. If you keep the plot pane open, you’ll see the stylized landscape update as the run progresses.
 
 **What it does**
-- Runs a minimal ABM configuration (one repetition of 100 timesteps across 3 precipitation scenarios, using only the conditions from experiment 1) and writes the outputs to Ts_Data_toy/.
-- Generates ABM burn-in plot into Manuscript_Vis_toy/.
+- Runs a minimal ABM configuration (one repetition of 100 timesteps across 3 precipitation scenarios, using only the conditions from experiment 1) and writes the outputs to `Ts_Data_toy/`.
+- Generates ABM burn-in plot into `Manuscript_Vis_toy/`.
 
 ```
   Rscript RunToy.R
@@ -51,7 +51,7 @@ The repo includes a small toy run that reproduces the core pipeline without the 
 
 *Option B (use pregenerated data):*
 
-Download [`Ts_Data`]([https://drive.google.com/file/d/1G6POSfm8SaYC4ZBgtwkPUq5TDhat1wRN/view?usp=sharing](https://syncandshare.lrz.de/getlink/fiPw7h8k9QaACopENWok9m/)) and place the folder in the repo root next to the scripts.
+Download [Ts_Data](https://syncandshare.lrz.de/getlink/fiPw7h8k9QaACopENWok9m/) and place the folder in the repo root next to the scripts.
 
 3. Analyze and plot:
 ```bash
