@@ -6,7 +6,7 @@ This repository contains the code for the agent-based model and experiments used
 - **RunModel.R**: Code for the agent-based model (ABM). Sources landscape files from `StylizedLandscape` and precipitation from `PrecipTimeseries.R` to create the initial landscape and generate precipitation scenarios. Runtime for one full setting across the three climate scenarios is ~45 minutes. It also supports a toy quickstart via environment variables.
 - **ToyRun.R**: Code for a toy run of ``RunModel.R``.
 - **GeneratePlots.R**: Code to reproduce visualizations for experiments 1-3 and supplementals from the manuscript. It expects ABM outputs in a Ts_Data-style folder (see below).
-- **ExperimentConditions.rds**: Predefined experimental settings for running the ABM, used in manuscript experiments 1 to 3 and supplemental material (forecast settings, provision of supplemental fodder, social learning settings, etc.).
+- **ExperimentConditions.rds**, **ConditionsExp1.rds**: Predefined experimental settings for running the ABM, used in manuscript experiments 1 to 3 and supplemental material (forecast settings, provision of supplemental fodder, social learning settings, etc.). The file ``ConditionsExp1.rds`` includes the conditions for experiment 1 only to run the toy example.
 - **StylizedLandscape/**: Scripts and inputs for creating the stylized landscape.
 - **AncillaryScripts/**: Ancillary scripts and inputs used for deriving parameters and settings for the ABM.
 
