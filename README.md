@@ -1,6 +1,6 @@
 # RegenerativeRangelandManagementABM
 
-This repository contains the code for the agent-based model and experiments used in the study ["Eliminating climate change mitigation trade-offs in African rangelands,"](link to paper) which explores how pairing forecasts with conservation programming can reduce trade-offs among vegetation cover, livestock numbers, and wealth inequality, supporting effective adaptation to climate change at scale.
+This repository contains the code for the agent-based model and experiments used in the study ["Eliminating climate change mitigation trade-offs in African rangelands,"](https://www.researchsquare.com/article/rs-7750461/v1) which explores how pairing forecasts with conservation programming can reduce trade-offs among vegetation cover, livestock numbers, and wealth inequality, supporting effective adaptation to climate change at scale.
 
 ## Repository structure
 - **RunModel.R**: Code for the agent-based model (ABM). Sources landscape files from `StylizedLandscape/` and precipitation from `PrecipTimeseries.R` to create the initial landscape and generate precipitation scenarios. Runtime for one full setting across the three climate scenarios is ~45 minutes. It also supports a toy quickstart via environment variables.
