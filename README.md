@@ -72,7 +72,7 @@ If you use this code in your work, please cite:
 ```bibtex
 @article{clark2025eliminating,
   title        = {Eliminating climate change mitigation trade-offs in African rangelands},
-  author       = {Clark, Matt and Fröhner, Cosima and Jørgensen, Andreas and others},
+  author       = {Clark, Matt and Fröhner, Cosima and Jørgensen, Andreas and Pienkowski, Thomas and Yekela, Sibabalo and Isacs, Aamirah and Crowe, Olivia and Andrews, Jeffrey and Smaldino, Paul and Gallizioli, Iacopo and Arena, Gina and Mills, Morena},
   year         = {2025},
   month        = {oct},
   note         = {PREPRINT (Version 1) available at Research Square},
