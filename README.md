@@ -70,11 +70,12 @@ Download [Ts_Data](https://syncandshare.lrz.de/getlink/fiPw7h8k9QaACopENWok9m/) 
 If you use this code in your work, please cite:
 
 ```bibtex
-@article{Clark2025Eliminating,
-  title     = {Eliminating climate change mitigation trade-offs in African rangelands},
-  author    = {Matt Clark†, Cosima Fröhner†, Andreas Christ Sølvsten Jørgensen, Thomas Pienkowski, Sibabalo Yekela, Aamirah Isacs, Olivia Crowe, Jeffrey Andrews, Paul E. Smaldino, Iacopo Tito Gallizioli, Gina Arena, Morena Mills},
-  year      = {2025},
-  note      = {In review},
-  doi       = {},
-  url       = {},
+@article{clark2025eliminating,
+  title        = {Eliminating climate change mitigation trade-offs in African rangelands},
+  author       = {Clark, Matt and Fröhner, Cosima and Jørgensen, Andreas and others},
+  year         = {2025},
+  month        = {oct},
+  note         = {PREPRINT (Version 1) available at Research Square},
+  doi          = {10.21203/rs.3.rs-7750461/v1},
+  url          = {https://doi.org/10.21203/rs.3.rs-7750461/v1}
 }
